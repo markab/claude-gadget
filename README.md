@@ -37,7 +37,11 @@ Built for the [Waveshare ESP32-S3-Touch-AMOLED-1.75C](https://docs.waveshare.com
 2. Plug in the board and click **Install firmware**. Pick the port, usually "USB JTAG/serial debug unit".
 3. On a first install, choose **Erase**. When updating, don't erase, and your Wi-Fi, token and settings are kept.
 
-If no port appears, hold **BOOT**, tap **PWR** (or unplug and replug), then release BOOT and try again.
+If no port appears (or the board is stuck restarting), start it in download mode. The chip checks BOOT only when it powers up:
+
+1. Hold **PWR** for 6 s to force the board off.
+2. Hold **BOOT**, press **PWR** to power on, then release BOOT.
+3. Retry the install. Without a battery fitted, you can instead hold BOOT while plugging in USB.
 
 Each [release](https://github.com/markab/claude-gadget/releases) also includes the firmware files, for flashing with `esptool`:
 
@@ -195,7 +199,7 @@ You can also update from the [web installer](https://markab.github.io/claude-gad
 | **Can't join the setup hotspot** | Forget the Claude-Gadget network on your phone and join again. |
 | **Numbers look stale** | Tap BOOT to refresh now. Check the refresh interval on Sound & alerts. |
 | **No sound** | Check Sound is on and the volume is above 5% on Sound & alerts. |
-| **Computer doesn't see the board** | Use a data cable. Hold BOOT, tap PWR, release BOOT, then retry. |
+| **Computer doesn't see the board** | Use a data cable. Then start it in download mode: hold PWR 6 s to turn off, hold BOOT and press PWR to power on, release BOOT, and retry. |
 
 ## How usage is read
 

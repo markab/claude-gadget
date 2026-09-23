@@ -9,7 +9,7 @@ static const char *SITE = "https://markab.github.io/claude-gadget/";
 static const uint32_t CHECK_EVERY_MS = 6UL * 3600 * 1000;
 static const uint32_t RETRY_MS = 10UL * 60 * 1000;
 
-static SemaphoreHandle_t mux;
+static SemaphoreHandle_t mux = nullptr;
 static String latest;           // guarded by mux
 static bool available = false;
 static String lastError;
@@ -75,6 +75,7 @@ void ota_begin() {
 bool ota_update_available() { return available; }
 
 String ota_latest_version() {
+    if (!mux) return "";   // the UI can ask before ota_begin() has run
     xSemaphoreTake(mux, portMAX_DELAY);
     String v = latest;
     xSemaphoreGive(mux);
