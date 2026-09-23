@@ -10,4 +10,5 @@ void ui_hide_hold_to_off();
 void ui_play_shutdown();                   // blocking ~1.2 s goodbye animation
 void ui_play_boot();                       // ~1.3 s intro, then Clawd idles until usage loads
 void ui_show_hourly(time_t now);          // Clawd + time for 10 s, tap to dismiss
+void ui_mark_refreshing(uint32_t seq);     // footer says "Refreshing..." until the snapshot seq moves on
 void ui_flash_message(const char *msg);   // brief toast at the bottom of the screen

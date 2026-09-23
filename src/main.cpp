@@ -111,11 +111,8 @@ static void handle_power_events() {
         if (display_is_awake()) screen_off();
         else screen_on();
     }
-    if (ev & (PWR_EVT_VBUS_IN | PWR_EVT_VBUS_OUT)) {
-        if (!display_is_awake()) screen_on();
-        ui_flash_message(ev & PWR_EVT_VBUS_IN ? LV_SYMBOL_CHARGE " Charging" : LV_SYMBOL_BATTERY_FULL " On battery");
-    }
-    if (ev & PWR_EVT_CHG_DONE && display_is_awake()) ui_flash_message(LV_SYMBOL_OK " Fully charged");
+    // Plug/unplug wakes the screen; the battery icon shows the charge state.
+    if ((ev & (PWR_EVT_VBUS_IN | PWR_EVT_VBUS_OUT)) && !display_is_awake()) screen_on();
 }
 
 static void handle_boot_button() {
@@ -135,8 +132,8 @@ static void handle_boot_button() {
         if (!holdFired && now - downAt > 40) {
             if (!display_is_awake()) screen_on();
             else {
+                ui_mark_refreshing(claude_snapshot().seq);
                 claude_refresh_now();
-                ui_flash_message(LV_SYMBOL_REFRESH " Refreshing");
             }
         }
         downAt = 0;

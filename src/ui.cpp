@@ -37,6 +37,8 @@ static lv_obj_t *lblInfo, *arcRam, *arcPsram;
 // Overlays
 static lv_obj_t *setupLayer, *setupTitle, *setupBody, *setupQr;
 static lv_obj_t *toast;
+static bool refreshing = false;
+static uint32_t refreshingSeq = 0, refreshingSince = 0;
 static String lastQr;
 // Wi-Fi tile
 static lv_obj_t *wifiList, *arcWifi, *lblWifiCap;
@@ -680,8 +682,11 @@ static void update_usage(const UsageSnapshot &u, const BatteryInfo &b, const Net
     update_window_labels(u.weekly, arcWeek, COL_WEEK, lblWeekPct, lblWeekReset, true, now);
 
     // Footer: freshness or what's wrong.
+    if (refreshing && (u.seq != refreshingSeq || millis() - refreshingSince > 20000)) refreshing = false;
+
     String foot;
-    if (n.mode == NET_CONNECTING) foot = "Connecting to Wi-Fi...";
+    if (refreshing && n.mode == NET_CONNECTED) foot = LV_SYMBOL_REFRESH " Refreshing...";
+    else if (n.mode == NET_CONNECTING) foot = "Connecting to Wi-Fi...";
     else if (n.mode == NET_AP_PORTAL) foot = "Setup hotspot on";
     else if (settings_get_token().isEmpty()) foot = "No Claude token";
     else if (u.state == FETCH_AUTH_ERROR) foot = "Token rejected\nhold BOOT to re-enter";
@@ -786,6 +791,13 @@ void ui_update(const UsageSnapshot &u, const BatteryInfo &b, const NetStatus &n)
 static void toast_hide_cb(lv_timer_t *t) {
     lv_obj_add_flag(toast, LV_OBJ_FLAG_HIDDEN);
     lv_timer_del(t);
+}
+
+void ui_mark_refreshing(uint32_t seq) {
+    refreshing = true;
+    refreshingSeq = seq;
+    refreshingSince = millis();
+    lv_label_set_text(lblFooter, LV_SYMBOL_REFRESH " Refreshing...");  // show it now, not on the next ui_update
 }
 
 void ui_flash_message(const char *msg) {
