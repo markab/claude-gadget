@@ -13,12 +13,12 @@ It starts on Usage. Swipe right from Usage for the clock; swipe left for the res
 0. **Clock**: Clawd, the time with seconds, and the date. Clawd hops once per second, in time with the seconds, and blinks.
 1. **Usage**: outer ring is the 5-hour session, inner ring is the week. Shows the session reset countdown, the weekly reset day and time. Rings turn amber at 75% and red at 90%. The bottom shows when it last updated, then the clock, Wi-Fi and battery.
 2. **Settings**: sliders for normal brightness, dimmed brightness (previewed on the panel while you drag) and auto-dim time (15 s – 30 min, or never). Saved across reboots.
-3. **Sound**: sound on/off, volume (5% steps; plays a preview blip when you let go), and a low-quota alert threshold (off, or 5–50% left).
+3. **Sound & alerts**: switches for sound and the hourly clock; sliders for volume (5% steps, preview blip on release), the low-quota alert threshold (off, or 5–50% left) and how often usage refreshes (1–60 min, default 5).
 4. **Wi-Fi**: outer ring shows signal strength of the current network. Saved networks are listed, with the connected one highlighted. Tap its ✕ twice to forget one.
 5. **Battery**: charge %, charging state (trickle/CC/CV/full), battery, USB and system voltages, and PMU temperature.
-6. **Device**: outer ring is internal RAM (heap) in use, inner ring is PSRAM in use. Also Wi-Fi network, signal, IP, uptime and firmware version, and a slider for how often usage refreshes (1–60 min, default 5).
+6. **Device**: outer ring is internal RAM (heap) in use, inner ring is PSRAM in use. Also Wi-Fi network, signal, IP, uptime and firmware version.
 
-On the hour, Clawd hops onto the screen with the time and date for 10 s (tap to dismiss). This only happens if the screen is on. To preview it, send `h` over the serial monitor.
+On the hour, Clawd hops onto the screen with the time and date for 10 s (tap to dismiss). This only happens if the screen is on, and can be switched off on the Sound & alerts page. To preview it, send `h` over the serial monitor.
 
 At power-on Clawd wakes up and stays on screen until your usage has loaded (at least 4 s; tap to skip). Holding PWR shows Clawd with a ring that fills over 2 s; letting go early cancels. At power-off he closes his eyes and sinks away.
 

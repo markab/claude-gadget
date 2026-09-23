@@ -30,6 +30,7 @@ void settings_load() {
     settings.dimSecs    = p.getUShort("dim", 60);
     settings.dimBrightness = p.getUChar("dimbr", 25);
     settings.soundOn    = p.getBool("snd", true);
+    settings.hourlyClock = p.getBool("hourly", true);
     settings.volume     = p.getUChar("vol", 60);
     settings.alertLeftPct = p.getUChar("alert", 10);
     p.end();
@@ -48,6 +49,7 @@ void settings_save() {
     p.putUShort("dim", settings.dimSecs);
     p.putUChar("dimbr", settings.dimBrightness);
     p.putBool("snd", settings.soundOn);
+    p.putBool("hourly", settings.hourlyClock);
     p.putUChar("vol", settings.volume);
     p.putUChar("alert", settings.alertLeftPct);
     p.end();

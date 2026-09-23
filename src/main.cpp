@@ -82,7 +82,7 @@ static void handle_hourly() {
     if (lastHour == -1) lastHour = tm.tm_hour;  // don't fire on boot
     if (tm.tm_hour == lastHour) return;
     lastHour = tm.tm_hour;
-    if (tm.tm_min == 0 && display_is_awake()) {
+    if (tm.tm_min == 0 && display_is_awake() && settings.hourlyClock) {
         ui_show_hourly(now);
         sound_play(SND_HOURLY);
     }
