@@ -34,7 +34,7 @@ static lv_obj_t *lblStatusBar, *lblSessionPct, *lblSessionReset, *lblWeekPct, *l
 static lv_obj_t *arcBatt, *lblBattPct, *lblBattState, *lblBattDetail;
 
 // Info tile
-static lv_obj_t *lblInfo, *arcRam, *arcPsram, *lblFw, *lblFwStatus, *btnUpdate, *lblUpdate;
+static lv_obj_t *lblInfo, *arcRam, *arcPsram, *lblFw, *lblFwStatus, *btnUpdate, *lblUpdate, *lblDeviceHint;
 static bool updateRequested = false;
 static const uint16_t POLL_STEPS[] = {1, 2, 3, 5, 10, 15, 30, 60};   // minutes
 static const int N_POLL_STEPS = sizeof(POLL_STEPS) / sizeof(POLL_STEPS[0]);
@@ -239,11 +239,13 @@ static void build_info(lv_obj_t *t) {
     lv_obj_center(lblUpdate);
     lv_obj_add_flag(btnUpdate, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(btnUpdate, [](lv_event_t *) { updateRequested = true; }, LV_EVENT_CLICKED, NULL);
+    // Greyed out (and not tappable) until USB power is connected.
+    lv_obj_set_style_bg_color(btnUpdate, COL_TRACK, LV_STATE_DISABLED);
+    lv_obj_set_style_text_color(lblUpdate, COL_MUTED, LV_STATE_DISABLED);
 
-
-    lv_obj_t *hint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
-    lv_label_set_text(hint, "Hold BOOT 3s for Wi-Fi / token setup");
-    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -56);
+    lblDeviceHint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
+    lv_label_set_text(lblDeviceHint, "");
+    lv_obj_align(lblDeviceHint, LV_ALIGN_BOTTOM_MID, 0, -56);
 }
 
 // Brightness sliders move in 5% steps (slider value = step, 1..20); settings keep the 0-255 level.
@@ -692,6 +694,10 @@ static void build_sound(lv_obj_t *t) {
 
     lv_event_send(sldVol, LV_EVENT_VALUE_CHANGED, NULL);
     lv_event_send(sldAlert, LV_EVENT_VALUE_CHANGED, NULL);
+
+    lv_obj_t *hint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
+    lv_label_set_text(hint, "Hold BOOT 3s to set Wi-Fi / token");
+    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -40);
 }
 
 static void build_setup_layer() {
@@ -870,7 +876,7 @@ static void update_battery(const BatteryInfo &b) {
     lv_label_set_text(lblBattDetail, d);
 }
 
-static void update_info(const NetStatus &n) {
+static void update_info(const NetStatus &n, const BatteryInfo &b) {
     uint32_t up = millis() / 1000;
     String s = "Up " + fmt_duration(up) + "\n";
     size_t ramTotal = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
@@ -890,6 +896,8 @@ static void update_info(const NetStatus &n) {
         if (strcmp(lv_label_get_text(lblUpdate), t.c_str()) != 0) lv_label_set_text(lblUpdate, t.c_str());
         lv_obj_add_flag(lblFw, LV_OBJ_FLAG_HIDDEN);
         lv_obj_clear_flag(btnUpdate, LV_OBJ_FLAG_HIDDEN);
+        if (b.vbus) lv_obj_clear_state(btnUpdate, LV_STATE_DISABLED);
+        else lv_obj_add_state(btnUpdate, LV_STATE_DISABLED);
     } else {
         lv_obj_clear_flag(lblFw, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(btnUpdate, LV_OBJ_FLAG_HIDDEN);
@@ -897,6 +905,9 @@ static void update_info(const NetStatus &n) {
     // Only claim "up to date" once a check has actually succeeded.
     const char *fwStatus = ota_update_available() ? "" : ota_latest_version().isEmpty() ? "" : "Up to date";
     if (strcmp(lv_label_get_text(lblFwStatus), fwStatus) != 0) lv_label_set_text(lblFwStatus, fwStatus);
+
+    const char *hint = !b.vbus ? "Connect power to update" : ota_update_available() ? "Tap Update to install" : "";
+    if (strcmp(lv_label_get_text(lblDeviceHint), hint) != 0) lv_label_set_text(lblDeviceHint, hint);
 }
 
 static void boot_splash_update(const UsageSnapshot &u, const NetStatus &n);
@@ -906,7 +917,7 @@ void ui_update(const UsageSnapshot &u, const BatteryInfo &b, const NetStatus &n)
     update_setup(u, n);
     update_usage(u, b, n);
     update_battery(b);
-    update_info(n);
+    update_info(n, b);
 
 
     // Wi-Fi page ring: signal strength, -90 dBm (empty) .. -50 dBm (full).
@@ -914,9 +925,7 @@ void ui_update(const UsageSnapshot &u, const BatteryInfo &b, const NetStatus &n)
         int pct = constrain((n.rssi + 90) * 100 / 40, 0, 100);
         lv_arc_set_value(arcWifi, pct);
         lv_obj_set_style_arc_color(arcWifi, n.rssi > -67 ? COL_OK : n.rssi > -78 ? COL_WARN : COL_CRIT, LV_PART_INDICATOR);
-        String cap = n.ssid + "  " LV_SYMBOL_BULLET "  " + String(n.rssi) + " dBm";
-        cap.toUpperCase();
-        cap += "\n" + n.ip;
+        String cap = String(n.rssi) + " dBm  " LV_SYMBOL_BULLET "  " + n.ip;
         lv_label_set_text(lblWifiCap, cap.c_str());
     } else {
         lv_arc_set_value(arcWifi, 0);

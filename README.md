@@ -130,13 +130,15 @@ The time with seconds, and the date.
 | **Alert at X% left** | Beeps and shows a warning when the session or weekly quota left drops to this level. Off, or 5–50%. It alerts once per window and again after that window resets. |
 | **Refresh every** | How often usage is checked: 1, 2, 3, 5, 10, 15, 30 or 60 minutes. The default is 5. |
 
+The hint at the bottom is a reminder that holding **BOOT** for 3 s opens the setup hotspot, where you can change the Wi-Fi or the token.
+
 <br clear="right">
 
 ### Wi-Fi
 
 <img src="docs/images/wifi.png" width="220" align="right" alt="Saved Wi-Fi networks">
 
-- **Top:** the current network, its signal strength and the gadget's IP address.
+- **Top:** signal strength and the gadget's IP address.
 - **Ring:** signal strength. The current network is highlighted in orange in the list.
 - **To forget a network:** tap its **✕**, then tap again within 3 s to confirm. If you forget the network you're connected to, the gadget disconnects and looks for another saved one.
 
@@ -160,6 +162,7 @@ The time with seconds, and the date.
 - **Inner ring:** PSRAM in use.
 - Also uptime and memory use.
 - **Firmware:** the installed version, with "Up to date" once the gadget has checked for a newer release. When one is available, this becomes an **Update to x.y.z** pill. See [Updates](#updates).
+- **Bottom hint:** "Connect power to update" on battery, or "Tap Update to install" when plugged in with an update waiting.
 
 <br clear="right">
 
@@ -168,9 +171,9 @@ The time with seconds, and the date.
 The gadget checks for a new release at startup and then every 6 hours, while it's on Wi-Fi.
 
 - When a newer version is available, the firmware line on the **Device** page becomes an orange **Update to x.y.z** pill.
-- Tap the pill to download and install the update over Wi-Fi. A progress ring shows the download. When it's finished, the gadget restarts on the new version.
+- With USB power connected, tap the pill to download and install the update over Wi-Fi. A progress ring shows the download. When it's finished, the gadget restarts on the new version.
 - Your Wi-Fi networks, token and settings are kept.
-- To update, the gadget must be plugged into USB or have at least 30% battery.
+- USB power must be connected. On battery the pill is greyed out, and the Device page says **Connect power to update**.
 - Don't power it off while updating. If an update fails (e.g. Wi-Fi drops), the gadget keeps running the current version and you can try again.
 
 You can also update from the [web installer](https://markab.github.io/claude-gadget/) over USB without erasing.

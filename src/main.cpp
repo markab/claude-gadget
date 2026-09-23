@@ -118,11 +118,7 @@ static void check_quota_alert(const UsageSnapshot &u) {
 // Device page "Update" pill: download and flash the latest release, then restart.
 static void handle_update_request() {
     if (!ui_take_update_request() || !ota_update_available()) return;
-    BatteryInfo b = power_battery();
-    if (!b.vbus && b.present && b.percent < 30) {
-        ui_flash_message(LV_SYMBOL_BATTERY_1 " Charge to 30% or plug in to update");
-        return;
-    }
+    if (!power_battery().vbus) return;   // the pill is disabled on battery; belt and braces
     String v = ota_latest_version();
     ui_show_updating(v.c_str());
     bool ok = ota_run(ui_set_update_progress);
