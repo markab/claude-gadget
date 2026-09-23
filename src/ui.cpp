@@ -429,7 +429,7 @@ void ui_init() {
     lv_obj_set_style_pad_hor(toast, 18, 0);
     lv_obj_set_style_pad_ver(toast, 10, 0);
     lv_obj_set_style_radius(toast, 22, 0);
-    lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -90);
+    lv_obj_align(toast, LV_ALIGN_BOTTOM_MID, 0, -112);
     lv_obj_add_flag(toast, LV_OBJ_FLAG_HIDDEN);
 }
 
