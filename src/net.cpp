@@ -23,6 +23,12 @@ static uint32_t lastRoam = 0;
 static bool portalForOutage = false;   // opened the hotspot for the current outage
 static uint32_t knownVersion = 0;
 
+// Last connection, for a fast rejoin (skips the scan) after net_resume().
+static bool suspended = false;
+static String lastSsid;
+static uint8_t lastBssid[6];
+static int32_t lastChannel = 0;
+
 static void load_known() {
     Preferences p;
     if (!p.begin("wifi", true)) return;
@@ -161,6 +167,7 @@ void net_begin() {
 }
 
 void net_loop() {
+    if (suspended) return;
     wm.process();
 
     bool connected = WiFi.status() == WL_CONNECTED;
@@ -170,6 +177,9 @@ void net_loop() {
         disconnectedSince = 0;
         portalForOutage = false;
         remember_current();
+        lastSsid = WiFi.SSID();
+        memcpy(lastBssid, WiFi.BSSID(), 6);
+        lastChannel = WiFi.channel();
         if (wm.getConfigPortalActive()) wm.stopConfigPortal();  // roamed onto a known network
         apply_time();
         // No token yet: keep a settings page up on the LAN so it can be entered.
@@ -216,6 +226,35 @@ void net_start_setup_portal() {
     wm.startConfigPortal(apName.c_str());
     mode = NET_AP_PORTAL;
 }
+
+bool net_suspend() {
+    if (suspended) return true;
+    if (wm.getConfigPortalActive()) return false;  // someone may be mid-setup
+    if (wm.getWebPortalActive()) wm.stopWebPortal();
+    Serial.println("[net] Wi-Fi off");
+    suspended = true;
+    WiFi.disconnect(true);
+    WiFi.mode(WIFI_OFF);
+    wasConnected = false;
+    mode = NET_CONNECTING;
+    return true;
+}
+
+void net_resume() {
+    if (!suspended) return;
+    suspended = false;
+    Serial.println("[net] Wi-Fi on");
+    WiFi.mode(WIFI_STA);
+    disconnectedSince = lastRoam = millis();   // roaming kicks in if this rejoin fails
+    portalForOutage = false;
+    const Cred *c = nullptr;
+    for (auto &k : known)
+        if (k.ssid == lastSsid) c = &k;
+    if (c && lastChannel > 0) WiFi.begin(c->ssid.c_str(), c->psk.c_str(), lastChannel, lastBssid);
+    else WiFi.begin();  // whatever the Wi-Fi stack has saved
+}
+
+bool net_is_suspended() { return suspended; }
 
 NetStatus net_status() {
     NetStatus s;

@@ -12,6 +12,8 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include <lvgl.h>
+#include <esp_sleep.h>
+#include <driver/gpio.h>
 #include "board.h"
 #include "settings.h"
 #include "power.h"
@@ -28,16 +30,39 @@ static uint32_t lowBattSince = 0;
 
 static void screen_off() {
     display_sleep();
-    claude_set_low_power(true);
     setCpuFrequencyMhz(80);
+    // On battery, Wi-Fi goes off until the screen comes back: no point polling
+    // numbers nobody can see. On USB it stays up and keeps refreshing.
+    // (Plugging/unplugging USB wakes the screen, so this is re-evaluated then.)
+    if (!power_battery().vbus) {
+        claude_set_low_power(true);
+        net_suspend();
+    }
 }
 
 static void screen_on() {
     setCpuFrequencyMhz(240);
+    net_resume();    // rejoins in ~1-3 s; the poll task refreshes as soon as it's connected
     display_wake();
     display_set_brightness(settings.brightness);
     dimmed = false;
     claude_set_low_power(false);
+}
+
+// Light-sleep for up to 150 ms with the screen off and Wi-Fi down. The PMU
+// latches PWR presses, so they're still seen on the next poll. A tap or BOOT
+// press wakes immediately. Returns true if a tap woke us.
+static bool nap() {
+    esp_sleep_enable_timer_wakeup(150 * 1000);
+    gpio_wakeup_enable((gpio_num_t)TP_INT, GPIO_INTR_LOW_LEVEL);
+    gpio_wakeup_enable((gpio_num_t)BTN_BOOT, GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
+    esp_light_sleep_start();
+    bool tap = esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_GPIO && digitalRead(TP_INT) == LOW;
+    gpio_wakeup_disable((gpio_num_t)TP_INT);
+    gpio_wakeup_disable((gpio_num_t)BTN_BOOT);
+    gpio_set_intr_type((gpio_num_t)TP_INT, GPIO_INTR_NEGEDGE);  // restore the touch ISR's edge trigger
+    return tap;
 }
 
 static void shutdown_now() {
@@ -160,8 +185,16 @@ void loop() {
     }
 
     if (!display_is_awake()) {
-        if (display_take_wake_tap()) screen_on();
-        delay(20);
+        if (display_take_wake_tap()) {
+            screen_on();
+            return;
+        }
+        // Light sleep kills USB serial, so only nap on battery.
+        if (net_is_suspended() && !power_battery().vbus) {
+            if (nap()) screen_on();
+        } else {
+            delay(20);
+        }
         return;
     }
 

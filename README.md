@@ -25,8 +25,9 @@ Inspired by [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter), which u
 | Screen tap | Wake the screen when it's off |
 
 Power behaviour:
-- **On battery**, the screen turns off after the auto-dim time (default 60 s) and usage polls slow to 3× the normal interval.
-- **On USB**, the screen drops to the dimmed brightness instead of turning off.
+- **Screen off on battery** (PWR tap, or idle): Wi-Fi switches off completely and polling stops, and the chip light-sleeps, waking every 150 ms to check the buttons. When the screen comes back it shows the last numbers, rejoins Wi-Fi (about 1–3 s) and refreshes.
+- **On battery**, the screen turns off after the auto-dim time (default 60 s).
+- **On USB**, the screen drops to the dimmed brightness instead of turning off. If you turn it off with PWR, Wi-Fi stays connected and keeps refreshing.
 - The device powers itself off after 30 s below 3.3 V.
 
 ## Build & flash

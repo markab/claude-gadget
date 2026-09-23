@@ -21,6 +21,9 @@ struct NetStatus {
 void net_begin();
 void net_loop();
 void net_start_setup_portal();   // open the setup hotspot (BOOT long-press)
+bool net_suspend();              // Wi-Fi fully off (screen off). False if the setup hotspot is up.
+void net_resume();               // Wi-Fi back on, fast rejoin of the last network
+bool net_is_suspended();
 NetStatus net_status();
 
 std::vector<String> net_saved_ssids();   // most recently used first
