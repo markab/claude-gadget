@@ -173,7 +173,7 @@ The gadget checks for a new release at startup and then every 6 hours, while it'
 - When a newer version is available, the firmware line on the **Device** page becomes an orange **Update to x.y.z** pill.
 - With USB power connected, tap the pill to download and install the update over Wi-Fi. A progress ring shows the download. When it's finished, the gadget restarts on the new version.
 - Your Wi-Fi networks, token and settings are kept.
-- USB power must be connected. On battery the pill is greyed out, and the Device page says **Connect power to update**.
+- USB power must be connected. On battery the pill shows as an orange outline and can't be tapped, and the Device page says **Connect power to update**.
 - Don't power it off while updating. If an update fails (e.g. Wi-Fi drops), the gadget keeps running the current version and you can try again.
 
 You can also update from the [web installer](https://markab.github.io/claude-gadget/) over USB without erasing.

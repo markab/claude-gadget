@@ -239,9 +239,18 @@ static void build_info(lv_obj_t *t) {
     lv_obj_center(lblUpdate);
     lv_obj_add_flag(btnUpdate, LV_OBJ_FLAG_HIDDEN);
     lv_obj_add_event_cb(btnUpdate, [](lv_event_t *) { updateRequested = true; }, LV_EVENT_CLICKED, NULL);
-    // Greyed out (and not tappable) until USB power is connected.
-    lv_obj_set_style_bg_color(btnUpdate, COL_TRACK, LV_STATE_DISABLED);
-    lv_obj_set_style_text_color(lblUpdate, COL_MUTED, LV_STATE_DISABLED);
+    // Until USB power is connected: an orange outline instead of a solid pill,
+    // still readable, not tappable. The default theme's grey filter is disabled
+    // because it made the text illegible.
+    lv_obj_set_style_color_filter_opa(btnUpdate, LV_OPA_TRANSP, LV_STATE_DISABLED);
+    lv_obj_set_style_bg_opa(btnUpdate, LV_OPA_TRANSP, LV_STATE_DISABLED);
+    lv_obj_set_style_border_width(btnUpdate, 2, LV_STATE_DISABLED);
+    lv_obj_set_style_border_color(btnUpdate, COL_CLAUDE, LV_STATE_DISABLED);
+    lv_obj_set_style_border_opa(btnUpdate, LV_OPA_COVER, LV_STATE_DISABLED);
+    // Text colour lives on the button (the label inherits it) so it follows the button's state.
+    lv_obj_remove_local_style_prop(lblUpdate, LV_STYLE_TEXT_COLOR, 0);
+    lv_obj_set_style_text_color(btnUpdate, lv_color_hex(0x1F1E1D), 0);
+    lv_obj_set_style_text_color(btnUpdate, COL_CLAUDE, LV_STATE_DISABLED);
 
     lblDeviceHint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
     lv_label_set_text(lblDeviceHint, "");
