@@ -17,7 +17,7 @@ It starts on Usage. Swipe right from Usage for the clock; swipe left for the res
 4. **Battery**: charge %, charging state (trickle/CC/CV/full), battery, USB and system voltages, and PMU temperature.
 5. **Device**: Wi-Fi network, signal, IP, poll interval, uptime, free memory, firmware version.
 
-On the hour, Clawd hops onto the screen with the time and date for 5 s (tap to dismiss). This only happens if the screen is on. To preview it, send `h` over the serial monitor.
+On the hour, Clawd hops onto the screen with the time and date for 10 s (tap to dismiss). This only happens if the screen is on. To preview it, send `h` over the serial monitor.
 
 At power-on Clawd wakes up and stays on screen until your usage has loaded (at least 4 s; tap to skip). Holding PWR shows Clawd with a ring that fills over 2 s; letting go early cancels. At power-off he closes his eyes and sinks away.
 

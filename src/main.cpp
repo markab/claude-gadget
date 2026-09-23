@@ -71,7 +71,7 @@ static bool nap() {
     return tap;
 }
 
-// Show Clawd + the time for 5 s when the hour changes (only if the screen is on).
+// Show Clawd + the time for 10 s when the hour changes (only if the screen is on).
 static void handle_hourly() {
     static int lastHour = -1;
     time_t now = time(nullptr);

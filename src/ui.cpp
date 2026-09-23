@@ -832,7 +832,7 @@ void ui_show_hourly(time_t now) {
     lv_obj_align(date, LV_ALIGN_CENTER, 0, 148);
 
     lv_obj_move_foreground(hourly);
-    hourlyTimer = lv_timer_create(hourly_timer_cb, 5000, NULL);
+    hourlyTimer = lv_timer_create(hourly_timer_cb, 10000, NULL);
     lv_timer_set_repeat_count(hourlyTimer, 1);
 }
 
