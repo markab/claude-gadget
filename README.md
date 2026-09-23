@@ -14,6 +14,8 @@ Inspired by [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter), which u
 4. **Battery**: charge %, charging state (trickle/CC/CV/full), battery, USB and system voltages, and PMU temperature.
 5. **Device**: Wi-Fi network, signal, IP, poll interval, uptime, free memory, firmware version.
 
+On the hour, Clawd hops onto the screen with the time and date for 5 s (tap to dismiss). This only happens if the screen is on. To preview it, send `h` over the serial monitor.
+
 ## Controls
 
 | Input | Action |

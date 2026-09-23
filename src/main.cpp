@@ -65,6 +65,19 @@ static bool nap() {
     return tap;
 }
 
+// Show Clawd + the time for 5 s when the hour changes (only if the screen is on).
+static void handle_hourly() {
+    static int lastHour = -1;
+    time_t now = time(nullptr);
+    if (now < 1700000000) return;  // clock not synced yet
+    struct tm tm;
+    localtime_r(&now, &tm);
+    if (lastHour == -1) lastHour = tm.tm_hour;  // don't fire on boot
+    if (tm.tm_hour == lastHour) return;
+    lastHour = tm.tm_hour;
+    if (tm.tm_min == 0 && display_is_awake()) ui_show_hourly(now);
+}
+
 static void shutdown_now() {
     if (!display_is_awake()) screen_on();
     ui_show_power_off();
@@ -197,6 +210,10 @@ void loop() {
         }
         return;
     }
+
+    handle_hourly();
+    // Serial 'h' previews the hourly screen.
+    if (Serial.available() && Serial.read() == 'h') ui_show_hourly(time(nullptr));
 
     UsageSnapshot u = claude_snapshot();
     if (now - lastUi >= 1000 || u.seq != lastSeq) {

@@ -602,3 +602,128 @@ void ui_show_power_off() {
     lv_refr_now(NULL);
 }
 
+
+// ---------------------------------------------------------------- hourly Clawd
+
+// Clawd, as drawn in Claude Code's welcome banner. Each banner character is a
+// half-block, so one character row = two square pixels here.
+static const char *CLAWD[] = {
+    ".#########.",
+    ".#########.",
+    "##.#####.##",   // eyes
+    "###########",
+    ".#########.",
+    ".#########.",
+    ".#.#...#.#.",   // legs
+    ".#.#...#.#.",
+};
+static const int CLAWD_W = 11, CLAWD_H = 8, PX = 24;
+
+static lv_obj_t *hourly = nullptr;
+static lv_timer_t *hourlyTimer = nullptr;
+
+static void hourly_close() {
+    if (hourlyTimer) {
+        lv_timer_del(hourlyTimer);
+        hourlyTimer = nullptr;
+    }
+    if (hourly) {
+        lv_obj_del_async(hourly);
+        hourly = nullptr;
+    }
+}
+
+static void hourly_timer_cb(lv_timer_t *) {
+    hourlyTimer = nullptr;  // one-shot; LVGL deletes it after this returns
+    if (hourly) {
+        lv_obj_del_async(hourly);
+        hourly = nullptr;
+    }
+}
+
+static void hourly_tap_cb(lv_event_t *) { hourly_close(); }
+
+static void anim_y_cb(void *obj, int32_t v) { lv_obj_set_style_translate_y((lv_obj_t *)obj, v, 0); }
+static void anim_h_cb(void *obj, int32_t v) { lv_obj_set_height((lv_obj_t *)obj, v); }
+
+void ui_show_hourly(time_t now) {
+    hourly_close();
+
+    hourly = lv_obj_create(lv_layer_top());
+    lv_obj_set_size(hourly, LCD_WIDTH, LCD_HEIGHT);
+    lv_obj_set_style_bg_color(hourly, COL_BG, 0);
+    lv_obj_set_style_bg_opa(hourly, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(hourly, 0, 0);
+    lv_obj_set_style_radius(hourly, 0, 0);
+    lv_obj_clear_flag(hourly, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(hourly, hourly_tap_cb, LV_EVENT_CLICKED, NULL);
+
+    lv_obj_t *sprite = lv_obj_create(hourly);
+    lv_obj_set_size(sprite, CLAWD_W * PX, CLAWD_H * PX);
+    lv_obj_set_style_bg_opa(sprite, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(sprite, 0, 0);
+    lv_obj_set_style_pad_all(sprite, 0, 0);
+    lv_obj_clear_flag(sprite, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+    lv_obj_align(sprite, LV_ALIGN_CENTER, 0, -60);
+
+    // One rectangle per horizontal run of pixels keeps the object count low.
+    for (int y = 0; y < CLAWD_H; y++) {
+        for (int x = 0; x < CLAWD_W;) {
+            if (CLAWD[y][x] != '#') { x++; continue; }
+            int x0 = x;
+            while (x < CLAWD_W && CLAWD[y][x] == '#') x++;
+            lv_obj_t *r = lv_obj_create(sprite);
+            lv_obj_remove_style_all(r);
+            lv_obj_set_style_bg_color(r, COL_CLAUDE, 0);
+            lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
+            lv_obj_set_pos(r, x0 * PX, y * PX);
+            lv_obj_set_size(r, (x - x0) * PX, PX);
+        }
+    }
+
+    // Blink: an orange lid over each eye closes briefly.
+    for (int ex : {2, 8}) {
+        lv_obj_t *lid = lv_obj_create(sprite);
+        lv_obj_remove_style_all(lid);
+        lv_obj_set_style_bg_color(lid, COL_CLAUDE, 0);
+        lv_obj_set_style_bg_opa(lid, LV_OPA_COVER, 0);
+        lv_obj_set_pos(lid, ex * PX, 2 * PX);
+        lv_obj_set_size(lid, PX, 0);
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, lid);
+        lv_anim_set_exec_cb(&a, anim_h_cb);
+        lv_anim_set_values(&a, 0, PX);
+        lv_anim_set_time(&a, 90);
+        lv_anim_set_playback_time(&a, 90);
+        lv_anim_set_delay(&a, 1400);
+        lv_anim_set_repeat_delay(&a, 1800);
+        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_start(&a);
+    }
+
+    // Gentle hop.
+    lv_anim_t hop;
+    lv_anim_init(&hop);
+    lv_anim_set_var(&hop, sprite);
+    lv_anim_set_exec_cb(&hop, anim_y_cb);
+    lv_anim_set_values(&hop, 0, -18);
+    lv_anim_set_time(&hop, 260);
+    lv_anim_set_playback_time(&hop, 260);
+    lv_anim_set_repeat_delay(&hop, 500);
+    lv_anim_set_path_cb(&hop, lv_anim_path_ease_out);
+    lv_anim_set_repeat_count(&hop, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_start(&hop);
+
+    lv_obj_t *clock = make_label(hourly, &lv_font_montserrat_48, COL_TEXT);
+    lv_label_set_text(clock, fmt_local(now, "%H:%M").c_str());
+    lv_obj_align(clock, LV_ALIGN_CENTER, 0, 100);
+
+    lv_obj_t *date = make_label(hourly, &lv_font_montserrat_20, COL_MUTED);
+    lv_label_set_text(date, fmt_local(now, "%A %e %B").c_str());
+    lv_obj_align(date, LV_ALIGN_CENTER, 0, 148);
+
+    lv_obj_move_foreground(hourly);
+    hourlyTimer = lv_timer_create(hourly_timer_cb, 5000, NULL);
+    lv_timer_set_repeat_count(hourlyTimer, 1);
+}
