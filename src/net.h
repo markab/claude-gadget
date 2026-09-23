@@ -1,5 +1,6 @@
 #pragma once
 #include <Arduino.h>
+#include <vector>
 
 enum NetMode : uint8_t {
     NET_CONNECTING,   // trying saved credentials
@@ -21,3 +22,7 @@ void net_begin();
 void net_loop();
 void net_start_setup_portal();   // open the setup hotspot (BOOT long-press)
 NetStatus net_status();
+
+std::vector<String> net_saved_ssids();   // most recently used first
+uint32_t net_saved_version();            // bumps whenever the saved list changes
+void net_forget(const String &ssid);     // forgetting the current network also disconnects

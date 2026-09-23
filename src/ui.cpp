@@ -4,6 +4,7 @@
 #include "display.h"
 #include <lvgl.h>
 #include <time.h>
+#include <vector>
 
 // 466x466 round AMOLED: true black background (pixels off), Claude-ish palette.
 #define COL_BG        lv_color_hex(0x000000)
@@ -32,6 +33,14 @@ static lv_obj_t *lblInfo;
 static lv_obj_t *setupLayer, *setupTitle, *setupBody, *setupQr;
 static lv_obj_t *toast;
 static String lastQr;
+// Wi-Fi tile
+static lv_obj_t *wifiList;
+static std::vector<String> wifiSsids;   // backs the delete buttons' user_data
+static uint32_t wifiListVersion = UINT32_MAX;
+static String wifiListCurrent;
+static lv_obj_t *armedBtn = nullptr;     // first tap arms a delete, second confirms
+static lv_timer_t *disarmTimer = nullptr;
+
 // Settings tile
 static lv_obj_t *sldBright, *lblBright, *sldDimLevel, *lblDimLevel, *sldDim, *lblDim;
 
@@ -269,6 +278,104 @@ static void build_settings(lv_obj_t *t) {
     lv_event_send(sldDim, LV_EVENT_VALUE_CHANGED, NULL);
 }
 
+static void set_trash_label(lv_obj_t *btn, bool armed) {
+    lv_obj_t *l = lv_obj_get_child(btn, 0);
+    lv_label_set_text(l, armed ? "Delete?" : LV_SYMBOL_TRASH);
+    lv_obj_set_style_bg_color(btn, armed ? COL_CRIT : COL_TRACK, 0);
+}
+
+static void disarm() {
+    if (armedBtn) set_trash_label(armedBtn, false);
+    armedBtn = nullptr;
+    if (disarmTimer) {
+        lv_timer_del(disarmTimer);
+        disarmTimer = nullptr;
+    }
+}
+
+static void disarm_timer_cb(lv_timer_t *) {
+    disarmTimer = nullptr;  // one-shot: LVGL deletes it after this returns
+    if (armedBtn) set_trash_label(armedBtn, false);
+    armedBtn = nullptr;
+}
+
+static void forget_cb(lv_event_t *e) {
+    lv_obj_t *btn = lv_event_get_target(e);
+    if (armedBtn != btn) {
+        disarm();
+        armedBtn = btn;
+        set_trash_label(btn, true);
+        disarmTimer = lv_timer_create(disarm_timer_cb, 3000, NULL);
+        lv_timer_set_repeat_count(disarmTimer, 1);
+        return;
+    }
+    size_t idx = (size_t)(uintptr_t)lv_event_get_user_data(e);
+    String ssid = idx < wifiSsids.size() ? wifiSsids[idx] : String();
+    disarm();
+    if (ssid.isEmpty()) return;
+    net_forget(ssid);
+    ui_flash_message((String(LV_SYMBOL_TRASH " Forgot ") + ssid).c_str());
+}
+
+static void rebuild_wifi_list(const NetStatus &n) {
+    disarm();
+    lv_obj_clean(wifiList);
+    wifiSsids = net_saved_ssids();
+    if (wifiSsids.empty()) {
+        lv_obj_t *l = make_label(wifiList, &lv_font_montserrat_20, COL_MUTED);
+        lv_label_set_text(l, "No saved networks");
+        return;
+    }
+    for (size_t i = 0; i < wifiSsids.size(); i++) {
+        bool current = n.mode == NET_CONNECTED && wifiSsids[i] == n.ssid;
+        lv_obj_t *row = lv_obj_create(wifiList);
+        lv_obj_set_size(row, lv_pct(100), 52);
+        lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+        lv_obj_set_style_border_width(row, 0, 0);
+        lv_obj_set_style_pad_all(row, 0, 0);
+        lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+
+        lv_obj_t *name = make_label(row, &lv_font_montserrat_20, current ? COL_CLAUDE : COL_TEXT);
+        lv_obj_set_style_text_align(name, LV_TEXT_ALIGN_LEFT, 0);
+        lv_label_set_long_mode(name, LV_LABEL_LONG_DOT);
+        lv_obj_set_width(name, 200);
+        lv_label_set_text(name, ((current ? LV_SYMBOL_WIFI " " : "") + wifiSsids[i]).c_str());
+        lv_obj_align(name, LV_ALIGN_LEFT_MID, 4, 0);
+
+        lv_obj_t *btn = lv_btn_create(row);
+        lv_obj_set_size(btn, 96, 42);
+        lv_obj_align(btn, LV_ALIGN_RIGHT_MID, 0, 0);
+        lv_obj_set_style_radius(btn, 21, 0);
+        lv_obj_set_style_shadow_width(btn, 0, 0);
+        lv_obj_t *bl = make_label(btn, &lv_font_montserrat_16, COL_TEXT);
+        lv_obj_center(bl);
+        set_trash_label(btn, false);
+        lv_obj_add_event_cb(btn, forget_cb, LV_EVENT_CLICKED, (void *)(uintptr_t)i);
+    }
+}
+
+static void build_wifi(lv_obj_t *t) {
+    lv_obj_t *cap = make_label(t, &lv_font_montserrat_16, COL_MUTED);
+    lv_label_set_text(cap, "SAVED WI-FI");
+    lv_obj_align(cap, LV_ALIGN_TOP_MID, 0, 58);
+
+    wifiList = lv_obj_create(t);
+    lv_obj_set_size(wifiList, 320, 290);
+    lv_obj_align(wifiList, LV_ALIGN_CENTER, 0, 4);
+    lv_obj_set_style_bg_opa(wifiList, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(wifiList, 0, 0);
+    lv_obj_set_style_pad_all(wifiList, 0, 0);
+    lv_obj_set_style_pad_row(wifiList, 4, 0);
+    lv_obj_set_flex_flow(wifiList, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(wifiList, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_scroll_dir(wifiList, LV_DIR_VER);
+    lv_obj_set_scrollbar_mode(wifiList, LV_SCROLLBAR_MODE_OFF);
+
+    lv_obj_t *hint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
+    lv_label_set_text(hint, "Tap " LV_SYMBOL_TRASH " twice to forget\nHold BOOT 3s to add a network");
+    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -52);
+}
+
 static void build_setup_layer() {
     setupLayer = lv_obj_create(lv_layer_top());
     lv_obj_set_size(setupLayer, LCD_WIDTH, LCD_HEIGHT);
@@ -305,11 +412,13 @@ void ui_init() {
     lv_obj_t *t0 = lv_tileview_add_tile(tv, 0, 0, LV_DIR_RIGHT);
     lv_obj_t *t1 = lv_tileview_add_tile(tv, 1, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
     lv_obj_t *t2 = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
-    lv_obj_t *t3 = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT);
+    lv_obj_t *t3 = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
+    lv_obj_t *t4 = lv_tileview_add_tile(tv, 4, 0, LV_DIR_LEFT);
     build_usage(t0);
     build_settings(t1);
-    build_battery(t2);
-    build_info(t3);
+    build_wifi(t2);
+    build_battery(t3);
+    build_info(t4);
 
     build_setup_layer();
 
@@ -460,6 +569,13 @@ void ui_update(const UsageSnapshot &u, const BatteryInfo &b, const NetStatus &n)
     update_usage(u, b, n);
     update_battery(b);
     update_info(n);
+
+    String current = n.mode == NET_CONNECTED ? n.ssid : String();
+    if (net_saved_version() != wifiListVersion || current != wifiListCurrent) {
+        wifiListVersion = net_saved_version();
+        wifiListCurrent = current;
+        rebuild_wifi_list(n);
+    }
 }
 
 static void toast_hide_cb(lv_timer_t *t) {

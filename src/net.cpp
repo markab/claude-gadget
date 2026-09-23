@@ -21,6 +21,7 @@ static std::vector<Cred> known;
 static uint32_t disconnectedSince = 0;
 static uint32_t lastRoam = 0;
 static bool portalForOutage = false;   // opened the hotspot for the current outage
+static uint32_t knownVersion = 0;
 
 static void load_known() {
     Preferences p;
@@ -57,6 +58,7 @@ static void remember_current() {
     known.insert(known.begin(), c);
     if (known.size() > MAX_KNOWN) known.resize(MAX_KNOWN);
     save_known();
+    knownVersion++;
     Serial.printf("[net] remembered %s (%u saved)\n", c.ssid.c_str(), (unsigned)known.size());
 }
 
@@ -226,4 +228,26 @@ NetStatus net_status() {
     s.rssi = connected ? WiFi.RSSI() : 0;
     s.saved = known.size();
     return s;
+}
+
+std::vector<String> net_saved_ssids() {
+    std::vector<String> v;
+    for (auto &c : known) v.push_back(c.ssid);
+    return v;
+}
+
+uint32_t net_saved_version() { return knownVersion; }
+
+void net_forget(const String &ssid) {
+    for (size_t i = 0; i < known.size(); i++) {
+        if (known[i].ssid != ssid) continue;
+        known.erase(known.begin() + i);
+        save_known();
+        knownVersion++;
+        Serial.printf("[net] forgot %s (%u saved)\n", ssid.c_str(), (unsigned)known.size());
+        break;
+    }
+    // The Wi-Fi stack keeps its own copy of the current network; erase that too
+    // so it isn't rejoined on reboot. Roaming then looks for another saved network.
+    if (WiFi.status() == WL_CONNECTED && WiFi.SSID() == ssid) WiFi.disconnect(false, true);
 }
