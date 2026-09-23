@@ -8,6 +8,9 @@ struct Settings {
     uint16_t pollMins;   // minutes between usage polls
     uint8_t brightness;  // 10..255, normal screen brightness
     uint8_t dimBrightness; // 2..255, brightness when idle on USB
+    bool soundOn;
+    uint8_t volume;         // 0-100, 5% steps
+    uint8_t alertLeftPct;   // alert when this much quota is left (0 = off)
     uint16_t dimSecs;    // screen off after this many idle seconds on battery (0 = never)
 };
 

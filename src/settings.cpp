@@ -29,6 +29,9 @@ void settings_load() {
     settings.brightness = p.getUChar("bright", 180);
     settings.dimSecs    = p.getUShort("dim", 60);
     settings.dimBrightness = p.getUChar("dimbr", 25);
+    settings.soundOn    = p.getBool("snd", true);
+    settings.volume     = p.getUChar("vol", 60);
+    settings.alertLeftPct = p.getUChar("alert", 10);
     p.end();
     if (settings.pollMins < 1) settings.pollMins = 1;
     if (settings.brightness < 10) settings.brightness = 10;
@@ -44,5 +47,8 @@ void settings_save() {
     p.putUChar("bright", settings.brightness);
     p.putUShort("dim", settings.dimSecs);
     p.putUChar("dimbr", settings.dimBrightness);
+    p.putBool("snd", settings.soundOn);
+    p.putUChar("vol", settings.volume);
+    p.putUChar("alert", settings.alertLeftPct);
     p.end();
 }

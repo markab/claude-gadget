@@ -21,6 +21,7 @@
 #include "net.h"
 #include "claude.h"
 #include "ui.h"
+#include "sound.h"
 
 static const uint16_t LOW_BATT_OFF_MV = 3300;      // auto power-off threshold
 static const uint32_t BOOT_HOLD_MS = 3000;
@@ -81,12 +82,43 @@ static void handle_hourly() {
     if (lastHour == -1) lastHour = tm.tm_hour;  // don't fire on boot
     if (tm.tm_hour == lastHour) return;
     lastHour = tm.tm_hour;
-    if (tm.tm_min == 0 && display_is_awake()) ui_show_hourly(now);
+    if (tm.tm_min == 0 && display_is_awake()) {
+        ui_show_hourly(now);
+        sound_play(SND_HOURLY);
+    }
+}
+
+// Low-quota alert: fires once per window when the quota left drops to the
+// threshold; re-arms when that window resets.
+static void check_quota_alert(const UsageSnapshot &u) {
+    static time_t alertedFor[2] = {0, 0};
+    if (u.state != FETCH_OK || settings.alertLeftPct == 0) return;
+    const UsageWindow *w[2] = {&u.session, &u.weekly};
+    const char *name[2] = {"Session", "Weekly"};
+    for (int i = 0; i < 2; i++) {
+        if (!w[i]->valid) continue;
+        int left = max(0, 100 - (int)roundf(w[i]->pct));
+        if (left > settings.alertLeftPct) {
+            alertedFor[i] = 0;
+            continue;
+        }
+        if (alertedFor[i] == w[i]->resetsAt && alertedFor[i] != 0) continue;
+        alertedFor[i] = w[i]->resetsAt ? w[i]->resetsAt : 1;
+        Serial.printf("[alert] %s quota %d%% left\n", name[i], left);
+        if (!display_is_awake()) screen_on();
+        char msg[48];
+        snprintf(msg, sizeof(msg), LV_SYMBOL_WARNING " %s: %d%% left", name[i], left);
+        ui_flash_message(msg);
+        sound_play(SND_ALERT);
+        break;  // one alert at a time
+    }
 }
 
 static void shutdown_now() {
     if (!display_is_awake()) screen_on();
+    sound_play(SND_SHUTDOWN);
     ui_play_shutdown();
+    sound_wait(1500);
     power_off();
 }
 
@@ -184,9 +216,11 @@ void setup() {
 
     settings_load();
     power_init();
+    sound_begin();
     display_init();
     display_set_brightness(settings.brightness);
     ui_init();
+    sound_play(SND_STARTUP);
     ui_play_boot();
     ui_update(UsageSnapshot{}, power_battery(), NetStatus{NET_CONNECTING});
     lv_timer_handler();
@@ -228,12 +262,21 @@ void loop() {
     }
 
     handle_hourly();
-    // Serial 'h' previews the hourly screen.
-    if (Serial.available() && Serial.read() == 'h') ui_show_hourly(time(nullptr));
+    // Serial 'h' previews the hourly screen, 'a' the quota alert sound.
+    if (Serial.available()) {
+        int c = Serial.read();
+        if (c == 'h') {
+            ui_show_hourly(time(nullptr));
+            sound_play(SND_HOURLY);
+        } else if (c == 'a') {
+            sound_play(SND_ALERT);
+        }
+    }
 
     UsageSnapshot u = claude_snapshot();
     if (now - lastUi >= 1000 || u.seq != lastSeq) {
         lastUi = now;
+        if (u.seq != lastSeq) check_quota_alert(u);
         lastSeq = u.seq;
         BatteryInfo b = power_battery();
         ui_update(u, b, net_status());

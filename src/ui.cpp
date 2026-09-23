@@ -2,6 +2,7 @@
 #include "board.h"
 #include "settings.h"
 #include "display.h"
+#include "sound.h"
 #include <lvgl.h>
 #include <time.h>
 #include <sys/time.h>
@@ -47,6 +48,9 @@ static uint32_t wifiListVersion = UINT32_MAX;
 static String wifiListCurrent;
 static lv_obj_t *armedBtn = nullptr;     // first tap arms a delete, second confirms
 static lv_timer_t *disarmTimer = nullptr;
+
+// Sound tile
+static lv_obj_t *swSound, *sldVol, *lblVol, *sldAlert, *lblAlert;
 
 // Settings tile
 static lv_obj_t *sldBright, *lblBright, *sldDimLevel, *lblDimLevel, *sldDim, *lblDim;
@@ -553,6 +557,73 @@ static void build_clock(lv_obj_t *t) {
     lv_timer_create(clock_tick_cb, 20, NULL);
 }
 
+// ---- Sound page
+static void sound_toggle_cb(lv_event_t *) {
+    settings.soundOn = lv_obj_has_state(swSound, LV_STATE_CHECKED);
+    settings_save();
+    if (settings.soundOn) sound_play(SND_PREVIEW);
+}
+
+static void vol_cb(lv_event_t *e) {
+    int step = lv_slider_get_value(sldVol);
+    settings.volume = step * 5;
+    lv_label_set_text_fmt(lblVol, "Volume  %d%%", settings.volume);
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+        settings_save();
+        sound_play(SND_PREVIEW);
+    }
+}
+
+static void alert_cb(lv_event_t *e) {
+    int step = lv_slider_get_value(sldAlert);   // 0 = off, 1..10 = 5..50%
+    settings.alertLeftPct = step * 5;
+    if (step == 0) lv_label_set_text(lblAlert, "Quota alert  Off");
+    else lv_label_set_text_fmt(lblAlert, "Alert at  %d%% left", settings.alertLeftPct);
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED) settings_save();
+}
+
+static void build_sound(lv_obj_t *t) {
+    lv_obj_t *cap = make_label(t, &lv_font_montserrat_16, COL_MUTED);
+    lv_label_set_text(cap, "SOUND");
+    lv_obj_align(cap, LV_ALIGN_TOP_MID, 0, 58);
+
+    lv_obj_t *lbl = make_label(t, &lv_font_montserrat_20, COL_TEXT);
+    lv_label_set_text(lbl, "Sound");
+    lv_obj_align(lbl, LV_ALIGN_CENTER, -60, -110);
+    swSound = lv_switch_create(t);
+    lv_obj_set_size(swSound, 70, 36);
+    lv_obj_align(swSound, LV_ALIGN_CENTER, 60, -110);
+    lv_obj_set_style_bg_color(swSound, COL_TRACK, LV_PART_MAIN);
+    lv_obj_set_style_bg_color(swSound, COL_CLAUDE, (lv_style_selector_t)LV_PART_INDICATOR | LV_STATE_CHECKED);
+    lv_obj_set_style_bg_color(swSound, COL_TEXT, LV_PART_KNOB);
+    lv_obj_set_ext_click_area(swSound, 16);
+    if (settings.soundOn) lv_obj_add_state(swSound, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(swSound, sound_toggle_cb, LV_EVENT_VALUE_CHANGED, NULL);
+
+    lblVol = make_label(t, &lv_font_montserrat_20, COL_TEXT);
+    lv_obj_align(lblVol, LV_ALIGN_CENTER, 0, -46);
+    sldVol = make_slider(t, -12, COL_CLAUDE);
+    lv_slider_set_range(sldVol, 1, 20);   // 5..100%
+    lv_slider_set_value(sldVol, constrain(settings.volume / 5, 1, 20), LV_ANIM_OFF);
+    lv_obj_add_event_cb(sldVol, vol_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(sldVol, vol_cb, LV_EVENT_RELEASED, NULL);
+
+    lblAlert = make_label(t, &lv_font_montserrat_20, COL_TEXT);
+    lv_obj_align(lblAlert, LV_ALIGN_CENTER, 0, 44);
+    sldAlert = make_slider(t, 78, COL_WARN);
+    lv_slider_set_range(sldAlert, 0, 10);  // off, 5..50%
+    lv_slider_set_value(sldAlert, constrain(settings.alertLeftPct / 5, 0, 10), LV_ANIM_OFF);
+    lv_obj_add_event_cb(sldAlert, alert_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(sldAlert, alert_cb, LV_EVENT_RELEASED, NULL);
+
+    lv_obj_t *hint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
+    lv_label_set_text(hint, "Startup, power-off, hourly chime\nand low-quota alert");
+    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -56);
+
+    lv_event_send(sldVol, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_event_send(sldAlert, LV_EVENT_VALUE_CHANGED, NULL);
+}
+
 static void build_setup_layer() {
     setupLayer = lv_obj_create(lv_layer_top());
     lv_obj_set_size(setupLayer, LCD_WIDTH, LCD_HEIGHT);
@@ -592,13 +663,15 @@ void ui_init() {
     lv_obj_t *t1 = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
     lv_obj_t *t2 = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
     lv_obj_t *t3 = lv_tileview_add_tile(tv, 4, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
-    lv_obj_t *t4 = lv_tileview_add_tile(tv, 5, 0, LV_DIR_LEFT);
+    lv_obj_t *t4 = lv_tileview_add_tile(tv, 5, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
+    lv_obj_t *t5 = lv_tileview_add_tile(tv, 6, 0, LV_DIR_LEFT);
     build_clock(tClock);
     build_usage(t0);
     build_settings(t1);
-    build_wifi(t2);
-    build_battery(t3);
-    build_info(t4);
+    build_sound(t2);
+    build_wifi(t3);
+    build_battery(t4);
+    build_info(t5);
     lv_obj_set_tile_id(tv, 1, 0, LV_ANIM_OFF);
 
     build_setup_layer();
