@@ -2,7 +2,7 @@
 
 A small round display that shows your **Claude Pro/Max plan usage**: the 5-hour session and weekly limits, how long until each resets, and an alert when you're running low. It connects over Wi-Fi on its own, so no computer or phone app needs to stay running.
 
-Built for the [Waveshare ESP32-S3-Touch-AMOLED-1.75C](https://docs.waveshare.com/ESP32-S3-Touch-AMOLED-1.75C).
+Built for the [Waveshare ESP32-S3-Touch-AMOLED-1.75C](https://www.waveshare.com/esp32-s3-touch-amoled-1.75c.htm) ([docs](https://docs.waveshare.com/ESP32-S3-Touch-AMOLED-1.75C)).
 
 **[Install from your browser →](https://markab.github.io/claude-gadget/)**
 
@@ -26,7 +26,7 @@ Built for the [Waveshare ESP32-S3-Touch-AMOLED-1.75C](https://docs.waveshare.com
 
 ## What you need
 
-- A Waveshare **ESP32-S3-Touch-AMOLED-1.75C**. A 3.7 V LiPo battery on the MX1.25 connector is optional.
+- A Waveshare **[ESP32-S3-Touch-AMOLED-1.75C](https://www.waveshare.com/esp32-s3-touch-amoled-1.75c.htm)**. A 3.7 V LiPo battery on the MX1.25 connector is optional.
 - A USB-C **data** cable. Charge-only cables won't work for installing.
 - A Claude **Pro or Max** subscription and [Claude Code](https://docs.anthropic.com/en/docs/claude-code) on any computer, to create a token.
 - 2.4 GHz Wi-Fi. The ESP32-S3 doesn't support 5 GHz.
