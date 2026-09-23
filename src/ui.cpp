@@ -39,7 +39,7 @@ static lv_obj_t *setupLayer, *setupTitle, *setupBody, *setupQr;
 static lv_obj_t *toast;
 static String lastQr;
 // Wi-Fi tile
-static lv_obj_t *wifiList;
+static lv_obj_t *wifiList, *arcWifi, *lblWifiCap;
 static std::vector<String> wifiSsids;   // backs the delete buttons' user_data
 static uint32_t wifiListVersion = UINT32_MAX;
 static String wifiListCurrent;
@@ -369,9 +369,12 @@ static void rebuild_wifi_list(const NetStatus &n) {
 }
 
 static void build_wifi(lv_obj_t *t) {
-    lv_obj_t *cap = make_label(t, &lv_font_montserrat_16, COL_MUTED);
-    lv_label_set_text(cap, "SAVED WI-FI");
-    lv_obj_align(cap, LV_ALIGN_TOP_MID, 0, 58);
+    arcWifi = make_arc(t, 452, 20, COL_OK);
+    lv_arc_set_range(arcWifi, 0, 100);
+
+    lblWifiCap = make_label(t, &lv_font_montserrat_16, COL_MUTED);
+    lv_label_set_text(lblWifiCap, "SAVED WI-FI");
+    lv_obj_align(lblWifiCap, LV_ALIGN_TOP_MID, 0, 58);
 
     wifiList = lv_obj_create(t);
     lv_obj_set_size(wifiList, 320, 290);
@@ -744,6 +747,19 @@ void ui_update(const UsageSnapshot &u, const BatteryInfo &b, const NetStatus &n)
     update_battery(b);
     update_info(n);
 
+
+    // Wi-Fi page ring: signal strength, -90 dBm (empty) .. -50 dBm (full).
+    if (n.mode == NET_CONNECTED) {
+        int pct = constrain((n.rssi + 90) * 100 / 40, 0, 100);
+        lv_arc_set_value(arcWifi, pct);
+        lv_obj_set_style_arc_color(arcWifi, n.rssi > -67 ? COL_OK : n.rssi > -78 ? COL_WARN : COL_CRIT, LV_PART_INDICATOR);
+        String cap = n.ssid + "  " LV_SYMBOL_BULLET "  " + String(n.rssi) + " dBm";
+        cap.toUpperCase();
+        lv_label_set_text(lblWifiCap, cap.c_str());
+    } else {
+        lv_arc_set_value(arcWifi, 0);
+        lv_label_set_text(lblWifiCap, "NOT CONNECTED");
+    }
 
     String current = n.mode == NET_CONNECTED ? n.ssid : String();
     if (net_saved_version() != wifiListVersion || current != wifiListCurrent) {
