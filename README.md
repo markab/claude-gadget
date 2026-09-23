@@ -130,7 +130,7 @@ The time with seconds, and the date.
 | **Alert at X% left** | Beeps and shows a warning when the session or weekly quota left drops to this level. Off, or 5–50%. It alerts once per window and again after that window resets. |
 | **Refresh every** | How often usage is checked: 1, 2, 3, 5, 10, 15, 30 or 60 minutes. The default is 5. |
 
-The hint at the bottom is a reminder that holding **BOOT** for 3 s opens the setup hotspot, where you can change the Wi-Fi or the token.
+The hint at the bottom is a reminder that holding **BOOT** for 3 s opens the setup hotspot, where you can change the token.
 
 <br clear="right">
 

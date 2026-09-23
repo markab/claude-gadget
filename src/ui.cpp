@@ -427,11 +427,11 @@ static void build_wifi(lv_obj_t *t) {
     lblWifiCap = make_label(t, &lv_font_montserrat_16, COL_MUTED);
     lv_label_set_text(lblWifiCap, "SAVED WI-FI");
     lv_obj_set_style_text_line_space(lblWifiCap, 4, 0);
-    lv_obj_align(lblWifiCap, LV_ALIGN_TOP_MID, 0, 48);
+    lv_obj_align(lblWifiCap, LV_ALIGN_TOP_MID, 0, 66);
 
     wifiList = lv_obj_create(t);
-    lv_obj_set_size(wifiList, 320, 290);
-    lv_obj_align(wifiList, LV_ALIGN_CENTER, 0, 14);
+    lv_obj_set_size(wifiList, 320, 270);
+    lv_obj_align(wifiList, LV_ALIGN_CENTER, 0, 24);
     lv_obj_set_style_bg_opa(wifiList, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(wifiList, 0, 0);
     lv_obj_set_style_pad_all(wifiList, 0, 0);
@@ -696,7 +696,7 @@ static void build_sound(lv_obj_t *t) {
     lv_event_send(sldAlert, LV_EVENT_VALUE_CHANGED, NULL);
 
     lv_obj_t *hint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
-    lv_label_set_text(hint, "Hold BOOT 3s to set Wi-Fi / token");
+    lv_label_set_text(hint, "Hold BOOT 3s to change token");
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -40);
 }
 
@@ -925,7 +925,7 @@ void ui_update(const UsageSnapshot &u, const BatteryInfo &b, const NetStatus &n)
         int pct = constrain((n.rssi + 90) * 100 / 40, 0, 100);
         lv_arc_set_value(arcWifi, pct);
         lv_obj_set_style_arc_color(arcWifi, n.rssi > -67 ? COL_OK : n.rssi > -78 ? COL_WARN : COL_CRIT, LV_PART_INDICATOR);
-        String cap = String(n.rssi) + " dBm  " LV_SYMBOL_BULLET "  " + n.ip;
+        String cap = String(n.rssi) + " dBm\n" + n.ip;
         lv_label_set_text(lblWifiCap, cap.c_str());
     } else {
         lv_arc_set_value(arcWifi, 0);
