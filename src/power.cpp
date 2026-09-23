@@ -61,7 +61,6 @@ uint8_t power_poll_events() {
     if (pmu.isVbusRemoveIrq())      ev |= PWR_EVT_VBUS_OUT;
     if (pmu.isBatChargeDoneIrq())   ev |= PWR_EVT_CHG_DONE;
     if (ev) {
-        Serial.printf("[pmu] events 0x%02x\n", ev);
         pmu.clearIrqStatus();
         lastRead = 0;  // force a fresh battery read on the next call
     }

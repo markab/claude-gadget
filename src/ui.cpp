@@ -4,6 +4,7 @@
 #include "display.h"
 #include <lvgl.h>
 #include <time.h>
+#include <sys/time.h>
 #include <vector>
 
 // 466x466 round AMOLED: true black background (pixels off), Claude-ish palette.
@@ -486,23 +487,34 @@ static void update_clock_labels(time_t now) {
     lv_obj_align_to(lblClockSec, lblClockTime, LV_ALIGN_OUT_RIGHT_BOTTOM, 2, -5);
 }
 
-// Ticks the clock page: new second -> update the labels and make Clawd hop once.
+// Clock page: Clawd hops once a second, timed so he lands as the seconds tick over.
+static const uint32_t HOP_UP_MS = 160, HOP_DOWN_MS = 200;
+
 static void clock_tick_cb(lv_timer_t *) {
-    static time_t last = 0;
+    static time_t lastShown = 0, lastHopFor = 0;
     if (lv_tileview_get_tile_act(tv) != tileClock) return;
-    time_t now = time(nullptr);
-    if (now == last) return;
-    last = now;
-    update_clock_labels(now);
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, clockClawd);
-    lv_anim_set_exec_cb(&a, anim_y_cb);
-    lv_anim_set_values(&a, 0, -14);
-    lv_anim_set_time(&a, 160);
-    lv_anim_set_playback_time(&a, 200);
-    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
-    lv_anim_start(&a);
+    struct timeval tv_;
+    gettimeofday(&tv_, nullptr);
+    time_t now = tv_.tv_sec;
+    uint32_t ms = tv_.tv_usec / 1000;
+
+    if (now != lastShown) {   // landing: the new second appears
+        lastShown = now;
+        update_clock_labels(now);
+    }
+    // Take off early enough to touch down on the next second boundary.
+    if (ms >= 1000 - (HOP_UP_MS + HOP_DOWN_MS) && lastHopFor != now + 1) {
+        lastHopFor = now + 1;
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, clockClawd);
+        lv_anim_set_exec_cb(&a, anim_y_cb);
+        lv_anim_set_values(&a, 0, -14);
+        lv_anim_set_time(&a, HOP_UP_MS);
+        lv_anim_set_playback_time(&a, HOP_DOWN_MS);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+        lv_anim_start(&a);
+    }
 }
 
 static void build_clock(lv_obj_t *t) {
@@ -520,7 +532,7 @@ static void build_clock(lv_obj_t *t) {
     lv_obj_align(lblClockDate, LV_ALIGN_CENTER, 0, 126);
 
     update_clock_labels(time(nullptr));
-    lv_timer_create(clock_tick_cb, 50, NULL);
+    lv_timer_create(clock_tick_cb, 20, NULL);
 }
 
 static void build_setup_layer() {
