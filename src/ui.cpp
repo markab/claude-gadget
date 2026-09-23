@@ -34,7 +34,7 @@ static lv_obj_t *lblStatusBar, *lblSessionPct, *lblSessionReset, *lblWeekPct, *l
 static lv_obj_t *arcBatt, *lblBattPct, *lblBattState, *lblBattDetail;
 
 // Info tile
-static lv_obj_t *lblInfo, *arcRam, *arcPsram, *lblFw, *btnUpdate, *lblUpdate;
+static lv_obj_t *lblInfo, *arcRam, *arcPsram, *lblFw, *lblFwStatus, *btnUpdate, *lblUpdate;
 static bool updateRequested = false;
 static const uint16_t POLL_STEPS[] = {1, 2, 3, 5, 10, 15, 30, 60};   // minutes
 static const int N_POLL_STEPS = sizeof(POLL_STEPS) / sizeof(POLL_STEPS[0]);
@@ -205,12 +205,22 @@ static void build_info(lv_obj_t *t) {
 
     lblInfo = make_label(t, &lv_font_montserrat_20, COL_TEXT);
     lv_obj_set_style_text_line_space(lblInfo, 8, 0);
-    lv_obj_align(lblInfo, LV_ALIGN_CENTER, 0, -18);
+    lv_obj_align(lblInfo, LV_ALIGN_CENTER, 0, -58);
+
+    lv_obj_t *line = lv_obj_create(t);
+    lv_obj_set_size(line, 180, 2);
+    lv_obj_set_style_bg_color(line, COL_TRACK, 0);
+    lv_obj_set_style_border_width(line, 0, 0);
+    lv_obj_align(line, LV_ALIGN_CENTER, 0, 10);
 
     // Firmware version, replaced by an "Update" pill when a newer release exists.
-    lblFw = make_label(t, &lv_font_montserrat_20, COL_TEXT);
+    lblFw = make_label(t, &lv_font_montserrat_28, COL_TEXT);
     lv_label_set_text(lblFw, "Firmware " FW_VERSION);
-    lv_obj_align(lblFw, LV_ALIGN_CENTER, 0, 96);
+    lv_obj_align(lblFw, LV_ALIGN_CENTER, 0, 54);
+
+    lblFwStatus = make_label(t, &lv_font_montserrat_16, COL_OK);
+    lv_label_set_text(lblFwStatus, "");
+    lv_obj_align(lblFwStatus, LV_ALIGN_CENTER, 0, 90);
 
     btnUpdate = lv_btn_create(t);
     lv_obj_set_height(btnUpdate, 44);
@@ -218,7 +228,7 @@ static void build_info(lv_obj_t *t) {
     lv_obj_set_style_radius(btnUpdate, 22, 0);
     lv_obj_set_style_bg_color(btnUpdate, COL_CLAUDE, 0);
     lv_obj_set_style_shadow_width(btnUpdate, 0, 0);
-    lv_obj_align(btnUpdate, LV_ALIGN_CENTER, 0, 100);
+    lv_obj_align(btnUpdate, LV_ALIGN_CENTER, 0, 60);
     lblUpdate = make_label(btnUpdate, &lv_font_montserrat_20, lv_color_hex(0x1F1E1D));
     lv_obj_center(lblUpdate);
     lv_obj_add_flag(btnUpdate, LV_OBJ_FLAG_HIDDEN);
@@ -408,11 +418,12 @@ static void build_wifi(lv_obj_t *t) {
 
     lblWifiCap = make_label(t, &lv_font_montserrat_16, COL_MUTED);
     lv_label_set_text(lblWifiCap, "SAVED WI-FI");
-    lv_obj_align(lblWifiCap, LV_ALIGN_TOP_MID, 0, 58);
+    lv_obj_set_style_text_line_space(lblWifiCap, 4, 0);
+    lv_obj_align(lblWifiCap, LV_ALIGN_TOP_MID, 0, 48);
 
     wifiList = lv_obj_create(t);
     lv_obj_set_size(wifiList, 320, 290);
-    lv_obj_align(wifiList, LV_ALIGN_CENTER, 0, 4);
+    lv_obj_align(wifiList, LV_ALIGN_CENTER, 0, 14);
     lv_obj_set_style_bg_opa(wifiList, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(wifiList, 0, 0);
     lv_obj_set_style_pad_all(wifiList, 0, 0);
@@ -855,19 +866,7 @@ static void update_battery(const BatteryInfo &b) {
 
 static void update_info(const NetStatus &n) {
     uint32_t up = millis() / 1000;
-    String s;
-    if (n.mode == NET_CONNECTED) {
-        const char *q = n.rssi > -55 ? "excellent" : n.rssi > -67 ? "good" : n.rssi > -78 ? "fair" : "weak";
-        s += LV_SYMBOL_WIFI " " + n.ssid + "\n";
-        s += String(n.rssi) + " dBm (" + q + ")\n";
-        s += n.ip + "\n";
-    } else if (n.mode == NET_AP_PORTAL) {
-        s += "Hotspot: " + n.apName + "\n";
-    } else {
-        s += "Wi-Fi connecting...\n";
-    }
-    s += "Saved Wi-Fi networks: " + String(n.saved) + "\n";
-    s += "Up " + fmt_duration(up) + "\n";
+    String s = "Up " + fmt_duration(up) + "\n";
     size_t ramTotal = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
     size_t ramFree = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
     size_t psTotal = ESP.getPsramSize(), psFree = ESP.getFreePsram();
@@ -877,7 +876,7 @@ static void update_info(const NetStatus &n) {
     lv_arc_set_value(arcPsram, psPct);
     lv_obj_set_style_arc_color(arcRam, level_color(ramPct, COL_CLAUDE), LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(arcPsram, level_color(psPct, COL_WEEK), LV_PART_INDICATOR);
-    s += "RAM " + String(ramPct) + "% \xE2\x80\xA2 PSRAM " + String(psPct) + "%";
+    s += "RAM " + String(ramPct) + "%\nPSRAM " + String(psPct) + "%";
     lv_label_set_text(lblInfo, s.c_str());
 
     if (ota_update_available()) {
@@ -889,6 +888,9 @@ static void update_info(const NetStatus &n) {
         lv_obj_clear_flag(lblFw, LV_OBJ_FLAG_HIDDEN);
         lv_obj_add_flag(btnUpdate, LV_OBJ_FLAG_HIDDEN);
     }
+    // Only claim "up to date" once a check has actually succeeded.
+    const char *fwStatus = ota_update_available() ? "" : ota_latest_version().isEmpty() ? "" : "Up to date";
+    if (strcmp(lv_label_get_text(lblFwStatus), fwStatus) != 0) lv_label_set_text(lblFwStatus, fwStatus);
 }
 
 static void boot_splash_update(const UsageSnapshot &u, const NetStatus &n);
@@ -908,6 +910,7 @@ void ui_update(const UsageSnapshot &u, const BatteryInfo &b, const NetStatus &n)
         lv_obj_set_style_arc_color(arcWifi, n.rssi > -67 ? COL_OK : n.rssi > -78 ? COL_WARN : COL_CRIT, LV_PART_INDICATOR);
         String cap = n.ssid + "  " LV_SYMBOL_BULLET "  " + String(n.rssi) + " dBm";
         cap.toUpperCase();
+        cap += "\n" + n.ip;
         lv_label_set_text(lblWifiCap, cap.c_str());
     } else {
         lv_arc_set_value(arcWifi, 0);

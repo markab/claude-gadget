@@ -132,7 +132,8 @@ The time with seconds, and the date.
 
 <img src="docs/images/wifi.png" width="220" align="right" alt="Saved Wi-Fi networks">
 
-- **Ring:** signal strength of the current network, which is highlighted in orange in the list.
+- **Top:** the current network, its signal strength and the gadget's IP address.
+- **Ring:** signal strength. The current network is highlighted in orange in the list.
 - **To forget a network:** tap its **✕**, then tap again within 3 s to confirm. If you forget the network you're connected to, the gadget disconnects and looks for another saved one.
 
 <br clear="right">
@@ -153,8 +154,8 @@ The time with seconds, and the date.
 
 - **Outer ring:** internal memory in use.
 - **Inner ring:** PSRAM in use.
-- Also the Wi-Fi network, signal, IP address, number of saved networks, uptime and firmware version.
-- **Update pill:** when a newer release is available, the firmware version is replaced by an **Update to x.y.z** pill. See [Updates](#updates).
+- Also uptime and memory use.
+- **Firmware:** the installed version, with "Up to date" once the gadget has checked for a newer release. When one is available, this becomes an **Update to x.y.z** pill. See [Updates](#updates).
 
 <br clear="right">
 
