@@ -10,7 +10,7 @@ Inspired by [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter), which u
 
 It starts on Usage. Swipe right from Usage for the clock; swipe left for the rest.
 
-0. **Clock**: Clawd (hopping, blinking), the time and the date.
+0. **Clock**: Clawd, the time with seconds, and the date. Clawd hops once per second, in time with the seconds, and blinks.
 1. **Usage**: outer ring is the 5-hour session, inner ring is the week. Shows the session reset countdown, the weekly reset day and time. Rings turn amber at 75% and red at 90%. The bottom shows when it last updated, then the clock, Wi-Fi and battery.
 2. **Settings**: sliders for normal brightness, dimmed brightness (previewed on the panel while you drag) and auto-dim time (15 s – 30 min, or never). Saved across reboots.
 3. **Wi-Fi**: saved networks, with the connected one highlighted. Tap its ✕ twice to forget one.
@@ -18,6 +18,8 @@ It starts on Usage. Swipe right from Usage for the clock; swipe left for the res
 5. **Device**: Wi-Fi network, signal, IP, poll interval, uptime, free memory, firmware version.
 
 On the hour, Clawd hops onto the screen with the time and date for 5 s (tap to dismiss). This only happens if the screen is on. To preview it, send `h` over the serial monitor.
+
+At power-on Clawd wakes up and stays on screen until your usage has loaded (at least 4 s; tap to skip). Holding PWR shows Clawd with a ring that fills over 2 s; letting go early cancels. At power-off he closes his eyes and sinks away.
 
 ## Controls
 

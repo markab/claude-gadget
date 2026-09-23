@@ -21,6 +21,8 @@ enum PowerEvent : uint8_t {
     PWR_EVT_VBUS_IN     = 1 << 2,
     PWR_EVT_VBUS_OUT    = 1 << 3,
     PWR_EVT_CHG_DONE    = 1 << 4,
+    PWR_EVT_KEY_DOWN    = 1 << 5,   // PWR pressed (edge)
+    PWR_EVT_KEY_UP      = 1 << 6,   // PWR released (edge)
 };
 
 bool power_init();              // call after Wire.begin()

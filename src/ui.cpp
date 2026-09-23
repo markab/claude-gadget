@@ -20,7 +20,8 @@
 static lv_obj_t *tv;
 
 // Clock tile
-static lv_obj_t *lblClockTime, *lblClockDate;
+static lv_obj_t *tileClock, *clockClawd, *lblClockTime, *lblClockSec, *lblClockDate;
+static lv_obj_t *clockLids[2];
 
 // Usage tile
 static lv_obj_t *arcSession, *arcWeek;
@@ -399,8 +400,40 @@ static const int CLAWD_W = 11, CLAWD_H = 8;
 static void anim_y_cb(void *obj, int32_t v) { lv_obj_set_style_translate_y((lv_obj_t *)obj, v, 0); }
 static void anim_h_cb(void *obj, int32_t v) { lv_obj_set_height((lv_obj_t *)obj, v); }
 
-// Builds an animated (hopping, blinking) Clawd with `px`-sized pixels. Caller aligns it.
-static lv_obj_t *make_clawd(lv_obj_t *parent, int px) {
+// Idle animation: blink via the eyelids, plus (optionally) a gentle free-running hop.
+static void clawd_animate(lv_obj_t *sprite, lv_obj_t **lids, int px, bool hop = true) {
+    for (int i = 0; i < 2; i++) {
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, lids[i]);
+        lv_anim_set_exec_cb(&a, anim_h_cb);
+        lv_anim_set_values(&a, 0, px);
+        lv_anim_set_time(&a, 90);
+        lv_anim_set_playback_time(&a, 90);
+        lv_anim_set_delay(&a, 1400);
+        lv_anim_set_repeat_delay(&a, 1800);
+        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_start(&a);
+    }
+    if (!hop) return;
+
+    lv_anim_t h;
+    lv_anim_init(&h);
+    lv_anim_set_var(&h, sprite);
+    lv_anim_set_exec_cb(&h, anim_y_cb);
+    lv_anim_set_values(&h, 0, -(px * 3) / 4);
+    lv_anim_set_time(&h, 260);
+    lv_anim_set_playback_time(&h, 260);
+    lv_anim_set_repeat_delay(&h, 500);
+    lv_anim_set_path_cb(&h, lv_anim_path_ease_out);
+    lv_anim_set_repeat_count(&h, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_start(&h);
+}
+
+// Builds Clawd with `px`-sized pixels. Caller aligns it. With `animate` he hops
+// and blinks; `lids` (optional, 2 entries) receives the eyelid objects, which are
+// open (height 0) initially.
+static lv_obj_t *make_clawd(lv_obj_t *parent, int px, bool animate = true, lv_obj_t **lids = nullptr) {
     lv_obj_t *sprite = lv_obj_create(parent);
     lv_obj_set_size(sprite, CLAWD_W * px, CLAWD_H * px);
     lv_obj_set_style_bg_opa(sprite, LV_OPA_TRANSP, 0);
@@ -423,50 +456,71 @@ static lv_obj_t *make_clawd(lv_obj_t *parent, int px) {
         }
     }
 
-    // Blink: an orange lid over each eye closes briefly.
+    // Eyelids: orange blocks over each eye, animated for blinks.
+    lv_obj_t *lid[2];
+    int li = 0;
     for (int ex : {2, 8}) {
-        lv_obj_t *lid = lv_obj_create(sprite);
-        lv_obj_remove_style_all(lid);
-        lv_obj_set_style_bg_color(lid, COL_CLAUDE, 0);
-        lv_obj_set_style_bg_opa(lid, LV_OPA_COVER, 0);
-        lv_obj_set_pos(lid, ex * px, 2 * px);
-        lv_obj_set_size(lid, px, 0);
-        lv_anim_t a;
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, lid);
-        lv_anim_set_exec_cb(&a, anim_h_cb);
-        lv_anim_set_values(&a, 0, px);
-        lv_anim_set_time(&a, 90);
-        lv_anim_set_playback_time(&a, 90);
-        lv_anim_set_delay(&a, 1400);
-        lv_anim_set_repeat_delay(&a, 1800);
-        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-        lv_anim_start(&a);
+        lid[li] = lv_obj_create(sprite);
+        lv_obj_remove_style_all(lid[li]);
+        lv_obj_set_style_bg_color(lid[li], COL_CLAUDE, 0);
+        lv_obj_set_style_bg_opa(lid[li], LV_OPA_COVER, 0);
+        lv_obj_set_pos(lid[li], ex * px, 2 * px);
+        lv_obj_set_size(lid[li], px, 0);
+        if (lids) lids[li] = lid[li];
+        li++;
     }
-
-    // Gentle hop.
-    lv_anim_t hop;
-    lv_anim_init(&hop);
-    lv_anim_set_var(&hop, sprite);
-    lv_anim_set_exec_cb(&hop, anim_y_cb);
-    lv_anim_set_values(&hop, 0, -(px * 3) / 4);
-    lv_anim_set_time(&hop, 260);
-    lv_anim_set_playback_time(&hop, 260);
-    lv_anim_set_repeat_delay(&hop, 500);
-    lv_anim_set_path_cb(&hop, lv_anim_path_ease_out);
-    lv_anim_set_repeat_count(&hop, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_start(&hop);
+    if (animate) clawd_animate(sprite, lid, px);
     return sprite;
 }
 
+static void update_clock_labels(time_t now) {
+    if (now > 1700000000) {
+        lv_label_set_text(lblClockTime, fmt_local(now, "%H:%M").c_str());
+        lv_label_set_text(lblClockSec, fmt_local(now, ":%S").c_str());
+        lv_label_set_text(lblClockDate, fmt_local(now, "%A %e %B").c_str());
+    } else {
+        lv_label_set_text(lblClockTime, "--:--");
+        lv_label_set_text(lblClockSec, "");
+        lv_label_set_text(lblClockDate, "Waiting for time");
+    }
+    lv_obj_align_to(lblClockSec, lblClockTime, LV_ALIGN_OUT_RIGHT_BOTTOM, 2, -5);
+}
+
+// Ticks the clock page: new second -> update the labels and make Clawd hop once.
+static void clock_tick_cb(lv_timer_t *) {
+    static time_t last = 0;
+    if (lv_tileview_get_tile_act(tv) != tileClock) return;
+    time_t now = time(nullptr);
+    if (now == last) return;
+    last = now;
+    update_clock_labels(now);
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, clockClawd);
+    lv_anim_set_exec_cb(&a, anim_y_cb);
+    lv_anim_set_values(&a, 0, -14);
+    lv_anim_set_time(&a, 160);
+    lv_anim_set_playback_time(&a, 200);
+    lv_anim_set_path_cb(&a, lv_anim_path_ease_out);
+    lv_anim_start(&a);
+}
+
 static void build_clock(lv_obj_t *t) {
-    lv_obj_align(make_clawd(t, 18), LV_ALIGN_CENTER, 0, -72);
+    tileClock = t;
+    clockClawd = make_clawd(t, 18, false, clockLids);
+    clawd_animate(clockClawd, clockLids, 18, false);  // blink only; hops are driven by the seconds
+    lv_obj_align(clockClawd, LV_ALIGN_CENTER, 0, -72);
 
     lblClockTime = make_label(t, &lv_font_montserrat_48, COL_TEXT);
-    lv_obj_align(lblClockTime, LV_ALIGN_CENTER, 0, 78);
+    lv_obj_align(lblClockTime, LV_ALIGN_CENTER, -26, 78);
+
+    lblClockSec = make_label(t, &lv_font_montserrat_28, COL_MUTED);
 
     lblClockDate = make_label(t, &lv_font_montserrat_20, COL_MUTED);
     lv_obj_align(lblClockDate, LV_ALIGN_CENTER, 0, 126);
+
+    update_clock_labels(time(nullptr));
+    lv_timer_create(clock_tick_cb, 50, NULL);
 }
 
 static void build_setup_layer() {
@@ -661,20 +715,15 @@ static void update_info(const NetStatus &n) {
     lv_label_set_text(lblInfo, s.c_str());
 }
 
+static void boot_splash_update(const UsageSnapshot &u, const NetStatus &n);
+
 void ui_update(const UsageSnapshot &u, const BatteryInfo &b, const NetStatus &n) {
+    boot_splash_update(u, n);
     update_setup(u, n);
     update_usage(u, b, n);
     update_battery(b);
     update_info(n);
 
-    time_t now = time(nullptr);
-    if (now > 1700000000) {
-        lv_label_set_text(lblClockTime, fmt_local(now, "%H:%M").c_str());
-        lv_label_set_text(lblClockDate, fmt_local(now, "%A %e %B").c_str());
-    } else {
-        lv_label_set_text(lblClockTime, "--:--");
-        lv_label_set_text(lblClockDate, "Waiting for time");
-    }
 
     String current = n.mode == NET_CONNECTED ? n.ssid : String();
     if (net_saved_version() != wifiListVersion || current != wifiListCurrent) {
@@ -696,16 +745,6 @@ void ui_flash_message(const char *msg) {
     lv_timer_create(toast_hide_cb, 1800, NULL);
 }
 
-void ui_show_power_off() {
-    lv_obj_t *o = lv_obj_create(lv_layer_top());
-    lv_obj_set_size(o, LCD_WIDTH, LCD_HEIGHT);
-    lv_obj_set_style_bg_color(o, COL_BG, 0);
-    lv_obj_set_style_border_width(o, 0, 0);
-    lv_obj_t *l = make_label(o, &lv_font_montserrat_28, COL_CLAUDE);
-    lv_label_set_text(l, LV_SYMBOL_POWER "\n\nPowering off");
-    lv_obj_center(l);
-    lv_refr_now(NULL);
-}
 
 
 // ---------------------------------------------------------------- hourly Clawd
@@ -759,4 +798,162 @@ void ui_show_hourly(time_t now) {
     lv_obj_move_foreground(hourly);
     hourlyTimer = lv_timer_create(hourly_timer_cb, 5000, NULL);
     lv_timer_set_repeat_count(hourlyTimer, 1);
+}
+
+// ---------------------------------------------------------------- power animations
+
+static lv_obj_t *powerLayer = nullptr;
+static lv_obj_t *powerClawd = nullptr, *powerRing = nullptr, *powerLabel = nullptr;
+static lv_obj_t *powerLids[2];
+static const int POWER_PX = 20;
+
+// Boot splash: stays up after the intro until usage has loaded.
+static bool bootSplash = false;
+static uint32_t bootSplashSince = 0;
+static lv_obj_t *bootStatus = nullptr;
+
+static void anim_x_cb(void *obj, int32_t v) { lv_obj_set_style_translate_x((lv_obj_t *)obj, v, 0); }
+static void anim_opa_cb(void *obj, int32_t v) { lv_obj_set_style_opa((lv_obj_t *)obj, v, 0); }
+static void anim_arc_cb(void *obj, int32_t v) { lv_arc_set_value((lv_obj_t *)obj, v); }
+
+static void run_anim(lv_obj_t *obj, lv_anim_exec_xcb_t cb, int32_t from, int32_t to, uint32_t ms,
+                     uint32_t delay = 0, lv_anim_path_cb_t path = lv_anim_path_ease_in_out) {
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, obj);
+    lv_anim_set_exec_cb(&a, cb);
+    lv_anim_set_values(&a, from, to);
+    lv_anim_set_time(&a, ms);
+    lv_anim_set_delay(&a, delay);
+    lv_anim_set_path_cb(&a, path);
+    lv_anim_start(&a);
+}
+
+// Full-screen black layer with a static Clawd; reused by hold / shutdown / boot.
+static void power_layer_create(const char *text) {
+    bootSplash = false;  // hold/shutdown take over from the boot splash
+    if (powerLayer) lv_obj_del(powerLayer);
+    powerLayer = lv_obj_create(lv_layer_top());
+    lv_obj_set_size(powerLayer, LCD_WIDTH, LCD_HEIGHT);
+    lv_obj_set_style_bg_color(powerLayer, COL_BG, 0);
+    lv_obj_set_style_bg_opa(powerLayer, LV_OPA_COVER, 0);
+    lv_obj_set_style_border_width(powerLayer, 0, 0);
+    lv_obj_set_style_radius(powerLayer, 0, 0);
+    lv_obj_clear_flag(powerLayer, LV_OBJ_FLAG_SCROLLABLE);
+
+    powerClawd = make_clawd(powerLayer, POWER_PX, false, powerLids);
+    lv_obj_align(powerClawd, LV_ALIGN_CENTER, 0, -30);
+
+    powerLabel = make_label(powerLayer, &lv_font_montserrat_20, COL_MUTED);
+    lv_label_set_text(powerLabel, text);
+    lv_obj_align(powerLabel, LV_ALIGN_CENTER, 0, 110);
+    powerRing = nullptr;
+    lv_obj_move_foreground(powerLayer);
+}
+
+static void power_layer_delete() {
+    if (!powerLayer) return;
+    lv_obj_del(powerLayer);
+    powerLayer = powerClawd = powerRing = powerLabel = nullptr;
+}
+
+static void set_lids(int h) {
+    for (auto *l : powerLids) lv_obj_set_height(l, h);
+}
+
+static void pump_ui(uint32_t ms) {
+    uint32_t end = millis() + ms;
+    while ((int32_t)(end - millis()) > 0) {
+        lv_timer_handler();
+        delay(5);
+    }
+}
+
+void ui_show_hold_to_off(uint32_t heldMs, uint32_t totalMs) {
+    power_layer_create("Keep holding to power off");
+
+    powerRing = make_arc(powerLayer, 452, 14, COL_CLAUDE);
+    lv_arc_set_bg_angles(powerRing, 0, 360);
+    lv_arc_set_rotation(powerRing, 270);
+    lv_arc_set_range(powerRing, 0, 1000);
+    int32_t start = min<uint32_t>(heldMs, totalMs) * 1000 / totalMs;
+    lv_arc_set_value(powerRing, start);
+    run_anim(powerRing, anim_arc_cb, start, 1000, totalMs > heldMs ? totalMs - heldMs : 1, 0, lv_anim_path_linear);
+
+    // Nervous jiggle.
+    lv_anim_t a;
+    lv_anim_init(&a);
+    lv_anim_set_var(&a, powerClawd);
+    lv_anim_set_exec_cb(&a, anim_x_cb);
+    lv_anim_set_values(&a, -4, 4);
+    lv_anim_set_time(&a, 70);
+    lv_anim_set_playback_time(&a, 70);
+    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_start(&a);
+    lv_obj_move_foreground(powerLayer);
+}
+
+void ui_hide_hold_to_off() { power_layer_delete(); }
+
+void ui_play_shutdown() {
+    power_layer_create("Goodbye");
+    lv_obj_set_style_text_color(powerLabel, COL_CLAUDE, 0);
+    pump_ui(250);
+    set_lids(POWER_PX);  // eyes closed
+    run_anim(powerClawd, anim_y_cb, 0, 70, 800, 300, lv_anim_path_ease_in);
+    run_anim(powerClawd, anim_opa_cb, LV_OPA_COVER, LV_OPA_TRANSP, 800, 300);
+    run_anim(powerLabel, anim_opa_cb, LV_OPA_COVER, LV_OPA_TRANSP, 600, 500);
+    pump_ui(1200);
+}
+
+void ui_play_boot() {
+    power_layer_create("");
+    lv_obj_align(powerLabel, LV_ALIGN_CENTER, 0, 100);
+    lv_obj_set_style_text_font(powerLabel, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_color(powerLabel, COL_TEXT, 0);
+    lv_label_set_text(powerLabel, "Claude Gadget");
+    lv_obj_set_style_opa(powerLabel, LV_OPA_TRANSP, 0);
+    set_lids(POWER_PX);  // asleep
+    lv_obj_set_style_opa(powerClawd, LV_OPA_TRANSP, 0);
+    run_anim(powerClawd, anim_y_cb, 80, 0, 600, 0, lv_anim_path_ease_out);
+    run_anim(powerClawd, anim_opa_cb, LV_OPA_TRANSP, LV_OPA_COVER, 500);
+    run_anim(powerLabel, anim_opa_cb, LV_OPA_TRANSP, LV_OPA_COVER, 500, 400);
+    pump_ui(800);
+    // Eyes open, one blink, a little hop.
+    run_anim(powerLids[0], anim_h_cb, POWER_PX, 0, 180);
+    run_anim(powerLids[1], anim_h_cb, POWER_PX, 0, 180);
+    pump_ui(350);
+    run_anim(powerClawd, anim_y_cb, 0, -16, 180, 0, lv_anim_path_ease_out);
+    pump_ui(180);
+    run_anim(powerClawd, anim_y_cb, -16, 0, 180, 0, lv_anim_path_ease_in);
+    pump_ui(250);
+
+    // Stay on screen, idling, until usage arrives (see ui_update).
+    clawd_animate(powerClawd, powerLids, POWER_PX);
+    bootStatus = make_label(powerLayer, &lv_font_montserrat_16, COL_MUTED);
+    lv_label_set_text(bootStatus, "Starting up...");
+    lv_obj_align(bootStatus, LV_ALIGN_CENTER, 0, 140);
+    lv_obj_add_flag(powerLayer, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_event_cb(powerLayer, [](lv_event_t *) { bootSplashSince = 0; }, LV_EVENT_CLICKED, NULL);
+    bootSplash = true;
+    bootSplashSince = millis();
+}
+
+static void boot_splash_update(const UsageSnapshot &u, const NetStatus &n) {
+    if (!bootSplash || !powerLayer) return;
+    uint32_t shown = millis() - bootSplashSince;
+    bool tapped = bootSplashSince == 0;
+    bool loaded = u.state != FETCH_IDLE;           // success or an error the footer will explain
+    bool needsSetup = n.mode == NET_AP_PORTAL || (n.mode == NET_CONNECTED && settings_get_token().isEmpty());
+
+    if (tapped || needsSetup || (loaded && shown >= 4000) || shown > 30000) {
+        bootSplash = false;
+        lv_obj_t *layer = powerLayer;
+        powerLayer = powerClawd = powerRing = powerLabel = bootStatus = nullptr;
+        lv_obj_fade_out(layer, 300, 0);
+        lv_obj_del_delayed(layer, 320);
+        return;
+    }
+    const char *st = n.mode == NET_CONNECTED ? "Fetching usage..." : "Connecting to Wi-Fi...";
+    if (strcmp(lv_label_get_text(bootStatus), st) != 0) lv_label_set_text(bootStatus, st);
 }

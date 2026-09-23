@@ -1,5 +1,4 @@
-#define XPOWERS_CHIP_AXP2101
-#include "power.h"
+#include "power.h"  // XPOWERS_CHIP_AXP2101 comes from build_flags
 #include "board.h"
 #include <Wire.h>
 #include <XPowersLib.h>
@@ -38,6 +37,7 @@ bool power_init() {
     pmu.disableIRQ(XPOWERS_AXP2101_ALL_IRQ);
     pmu.clearIrqStatus();
     pmu.enableIRQ(XPOWERS_AXP2101_PKEY_SHORT_IRQ | XPOWERS_AXP2101_PKEY_LONG_IRQ |
+                  XPOWERS_AXP2101_PKEY_NEGATIVE_IRQ | XPOWERS_AXP2101_PKEY_POSITIVE_IRQ |
                   XPOWERS_AXP2101_VBUS_INSERT_IRQ | XPOWERS_AXP2101_VBUS_REMOVE_IRQ |
                   XPOWERS_AXP2101_BAT_CHG_DONE_IRQ);
     return true;
@@ -54,10 +54,14 @@ uint8_t power_poll_events() {
     uint8_t ev = PWR_EVT_NONE;
     if (pmu.isPekeyShortPressIrq()) ev |= PWR_EVT_SHORT_PRESS;
     if (pmu.isPekeyLongPressIrq())  ev |= PWR_EVT_LONG_PRESS;
+    // PWRON is active-low: negative edge = pressed, positive edge = released.
+    if (pmu.isPekeyNegativeIrq())   ev |= PWR_EVT_KEY_DOWN;
+    if (pmu.isPekeyPositiveIrq())   ev |= PWR_EVT_KEY_UP;
     if (pmu.isVbusInsertIrq())      ev |= PWR_EVT_VBUS_IN;
     if (pmu.isVbusRemoveIrq())      ev |= PWR_EVT_VBUS_OUT;
     if (pmu.isBatChargeDoneIrq())   ev |= PWR_EVT_CHG_DONE;
     if (ev) {
+        Serial.printf("[pmu] events 0x%02x\n", ev);
         pmu.clearIrqStatus();
         lastRead = 0;  // force a fresh battery read on the next call
     }

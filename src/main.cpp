@@ -28,6 +28,12 @@ static const uint32_t BOOT_HOLD_MS = 3000;
 static bool dimmed = false;
 static uint32_t lowBattSince = 0;
 
+// PWR hold-to-power-off animation state
+static const uint32_t PWR_LONG_MS = 2000;   // matches the PMU IRQ level time
+static const uint32_t HOLD_SHOW_MS = 350;   // quick taps never show the overlay
+static uint32_t keyDownAt = 0;
+static bool holdShown = false;
+
 static void screen_off() {
     display_sleep();
     setCpuFrequencyMhz(80);
@@ -80,16 +86,28 @@ static void handle_hourly() {
 
 static void shutdown_now() {
     if (!display_is_awake()) screen_on();
-    ui_show_power_off();
-    delay(700);
+    ui_play_shutdown();
     power_off();
 }
 
 static void handle_power_events() {
     uint8_t ev = power_poll_events();
+    bool abortedHold = false;
+    if ((ev & PWR_EVT_KEY_DOWN) && !(ev & PWR_EVT_KEY_UP)) keyDownAt = millis();
+    if (ev & PWR_EVT_KEY_UP) {
+        abortedHold = holdShown;   // let go before 2 s: cancel, don't also toggle the screen
+        if (holdShown) ui_hide_hold_to_off();
+        holdShown = false;
+        keyDownAt = 0;
+    }
+    if (keyDownAt && !holdShown && display_is_awake() && millis() - keyDownAt >= HOLD_SHOW_MS) {
+        holdShown = true;
+        ui_show_hold_to_off(millis() - keyDownAt, PWR_LONG_MS);
+    }
+
     if (ev & PWR_EVT_LONG_PRESS) {
         shutdown_now();
-    } else if (ev & PWR_EVT_SHORT_PRESS) {
+    } else if ((ev & PWR_EVT_SHORT_PRESS) && !abortedHold) {
         if (display_is_awake()) screen_off();
         else screen_on();
     }
@@ -172,6 +190,7 @@ void setup() {
     display_init();
     display_set_brightness(settings.brightness);
     ui_init();
+    ui_play_boot();
     ui_update(UsageSnapshot{}, power_battery(), NetStatus{NET_CONNECTING});
     lv_timer_handler();
 

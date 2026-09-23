@@ -3,7 +3,6 @@
 #include "claude.h"
 #include <WiFi.h>
 #include <WiFiManager.h>
-#include <WiFiMulti.h>
 #include <Preferences.h>
 #include <vector>
 
@@ -68,14 +67,67 @@ static void remember_current() {
     Serial.printf("[net] remembered %s (%u saved)\n", c.ssid.c_str(), (unsigned)known.size());
 }
 
-// Scan and join the strongest known network. Blocks for a few seconds.
-static bool try_known() {
+// Roaming: async scan, then join the strongest known network. Non-blocking so
+// the UI keeps animating; driven from net_loop().
+enum RoamState : uint8_t { ROAM_IDLE, ROAM_SCAN, ROAM_JOIN };
+static RoamState roam = ROAM_IDLE;
+static uint32_t roamStart = 0;
+static bool bootRoam = false;   // the first attempt at power-on: open the hotspot if it fails
+
+static void start_roam() {
     lastRoam = millis();
-    if (known.empty()) return false;
-    Serial.println("[net] looking for known networks");
-    WiFiMulti multi;
-    for (auto &c : known) multi.addAP(c.ssid.c_str(), c.psk.c_str());
-    return multi.run(10000) == WL_CONNECTED;
+    if (known.empty() || roam != ROAM_IDLE) return;
+    Serial.println("[net] scanning for known networks");
+    if (WiFi.scanNetworks(true) == WIFI_SCAN_FAILED) return;
+    roam = ROAM_SCAN;
+    roamStart = millis();
+}
+
+static void roam_failed() {
+    roam = ROAM_IDLE;
+    if (bootRoam) {
+        bootRoam = false;
+        Serial.println("[net] no known network in range");
+        portalForOutage = true;
+        wm.startConfigPortal(apName.c_str());  // no timeout: nothing else to do until set up
+        mode = NET_AP_PORTAL;
+    }
+}
+
+static void roam_step() {
+    if (roam == ROAM_SCAN) {
+        int n = WiFi.scanComplete();
+        if (n == WIFI_SCAN_RUNNING) return;
+        if (n < 0) return roam_failed();
+        int best = -1, bestRssi = -1000;
+        const Cred *bestCred = nullptr;
+        for (int i = 0; i < n; i++)
+            for (auto &c : known)
+                if (WiFi.SSID(i) == c.ssid && WiFi.RSSI(i) > bestRssi) {
+                    best = i;
+                    bestRssi = WiFi.RSSI(i);
+                    bestCred = &c;
+                }
+        if (best < 0) {
+            WiFi.scanDelete();
+            return roam_failed();
+        }
+        uint8_t bssid[6];
+        memcpy(bssid, WiFi.BSSID(best), 6);
+        int32_t ch = WiFi.channel(best);
+        WiFi.scanDelete();
+        Serial.printf("[net] joining %s (%d dBm)\n", bestCred->ssid.c_str(), bestRssi);
+        WiFi.begin(bestCred->ssid.c_str(), bestCred->psk.c_str(), ch, bssid);
+        roam = ROAM_JOIN;
+        roamStart = millis();
+    } else if (roam == ROAM_JOIN) {
+        if (WiFi.status() == WL_CONNECTED) {
+            roam = ROAM_IDLE;
+            bootRoam = false;
+        } else if (millis() - roamStart > 12000) {
+            roam_failed();
+        }
+    }
 }
 
 // The token field is never pre-filled: anyone who joins the setup hotspot
@@ -157,18 +209,18 @@ void net_begin() {
         // First run (or upgraded from single-network firmware): let WiFiManager
         // use whatever the Wi-Fi stack has saved; it's added to the list on connect.
         mode = wm.autoConnect(apName.c_str()) ? NET_CONNECTED : NET_AP_PORTAL;
-    } else if (try_known()) {
-        mode = NET_CONNECTED;
     } else {
-        Serial.println("[net] no known network in range");
-        wm.startConfigPortal(apName.c_str());
-        mode = NET_AP_PORTAL;
+        bootRoam = true;
+        disconnectedSince = millis();
+        start_roam();   // finishes in net_loop(); opens the hotspot if nothing is found
+        mode = NET_CONNECTING;
     }
 }
 
 void net_loop() {
     if (suspended) return;
     wm.process();
+    roam_step();
 
     bool connected = WiFi.status() == WL_CONNECTED;
     if (connected && !wasConnected) {
@@ -201,8 +253,9 @@ void net_loop() {
         bool portal = wm.getConfigPortalActive();
         bool apInUse = portal && WiFi.softAPgetStationNum() > 0;
         uint32_t every = portal ? 60000 : 30000;
-        if (!apInUse && !known.empty() && now - disconnectedSince > 15000 && now - lastRoam > every)
-            try_known();
+        if (!apInUse && roam == ROAM_IDLE && !known.empty() && now - disconnectedSince > 15000 &&
+            now - lastRoam > every)
+            start_roam();
         // Still nothing after 90 s: open the hotspot so a new network can be added.
         if (!portalForOutage && !portal && now - disconnectedSince > 90000) {
             portalForOutage = true;
@@ -233,6 +286,9 @@ bool net_suspend() {
     if (wm.getWebPortalActive()) wm.stopWebPortal();
     Serial.println("[net] Wi-Fi off");
     suspended = true;
+    if (roam == ROAM_SCAN) WiFi.scanDelete();
+    roam = ROAM_IDLE;
+    bootRoam = false;
     WiFi.disconnect(true);
     WiFi.mode(WIFI_OFF);
     wasConnected = false;
