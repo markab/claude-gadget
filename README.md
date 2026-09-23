@@ -8,6 +8,9 @@ Inspired by [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter), which u
 
 ## Screens (swipe left/right)
 
+It starts on Usage. Swipe right from Usage for the clock; swipe left for the rest.
+
+0. **Clock**: Clawd (hopping, blinking), the time and the date.
 1. **Usage**: outer ring is the 5-hour session, inner ring is the week. Shows the session reset countdown, the weekly reset day and time. Rings turn amber at 75% and red at 90%. The bottom shows when it last updated, then the clock, Wi-Fi and battery.
 2. **Settings**: sliders for normal brightness, dimmed brightness (previewed on the panel while you drag) and auto-dim time (15 s – 30 min, or never). Saved across reboots.
 3. **Wi-Fi**: saved networks, with the connected one highlighted. Tap its ✕ twice to forget one.

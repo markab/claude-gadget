@@ -19,6 +19,9 @@
 
 static lv_obj_t *tv;
 
+// Clock tile
+static lv_obj_t *lblClockTime, *lblClockDate;
+
 // Usage tile
 static lv_obj_t *arcSession, *arcWeek;
 static lv_obj_t *lblStatusBar, *lblSessionPct, *lblSessionReset, *lblWeekPct, *lblWeekReset, *lblFooter;
@@ -377,6 +380,95 @@ static void build_wifi(lv_obj_t *t) {
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -52);
 }
 
+// ---------------------------------------------------------------- Clawd
+
+// Clawd, as drawn in Claude Code's welcome banner. Each banner character is a
+// half-block, so one character row = two square pixels here.
+static const char *CLAWD[] = {
+    ".#########.",
+    ".#########.",
+    "##.#####.##",   // eyes
+    "###########",
+    ".#########.",
+    ".#########.",
+    ".#.#...#.#.",   // legs
+    ".#.#...#.#.",
+};
+static const int CLAWD_W = 11, CLAWD_H = 8;
+
+static void anim_y_cb(void *obj, int32_t v) { lv_obj_set_style_translate_y((lv_obj_t *)obj, v, 0); }
+static void anim_h_cb(void *obj, int32_t v) { lv_obj_set_height((lv_obj_t *)obj, v); }
+
+// Builds an animated (hopping, blinking) Clawd with `px`-sized pixels. Caller aligns it.
+static lv_obj_t *make_clawd(lv_obj_t *parent, int px) {
+    lv_obj_t *sprite = lv_obj_create(parent);
+    lv_obj_set_size(sprite, CLAWD_W * px, CLAWD_H * px);
+    lv_obj_set_style_bg_opa(sprite, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(sprite, 0, 0);
+    lv_obj_set_style_pad_all(sprite, 0, 0);
+    lv_obj_clear_flag(sprite, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
+
+    // One rectangle per horizontal run of pixels keeps the object count low.
+    for (int y = 0; y < CLAWD_H; y++) {
+        for (int x = 0; x < CLAWD_W;) {
+            if (CLAWD[y][x] != '#') { x++; continue; }
+            int x0 = x;
+            while (x < CLAWD_W && CLAWD[y][x] == '#') x++;
+            lv_obj_t *r = lv_obj_create(sprite);
+            lv_obj_remove_style_all(r);
+            lv_obj_set_style_bg_color(r, COL_CLAUDE, 0);
+            lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
+            lv_obj_set_pos(r, x0 * px, y * px);
+            lv_obj_set_size(r, (x - x0) * px, px);
+        }
+    }
+
+    // Blink: an orange lid over each eye closes briefly.
+    for (int ex : {2, 8}) {
+        lv_obj_t *lid = lv_obj_create(sprite);
+        lv_obj_remove_style_all(lid);
+        lv_obj_set_style_bg_color(lid, COL_CLAUDE, 0);
+        lv_obj_set_style_bg_opa(lid, LV_OPA_COVER, 0);
+        lv_obj_set_pos(lid, ex * px, 2 * px);
+        lv_obj_set_size(lid, px, 0);
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, lid);
+        lv_anim_set_exec_cb(&a, anim_h_cb);
+        lv_anim_set_values(&a, 0, px);
+        lv_anim_set_time(&a, 90);
+        lv_anim_set_playback_time(&a, 90);
+        lv_anim_set_delay(&a, 1400);
+        lv_anim_set_repeat_delay(&a, 1800);
+        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_start(&a);
+    }
+
+    // Gentle hop.
+    lv_anim_t hop;
+    lv_anim_init(&hop);
+    lv_anim_set_var(&hop, sprite);
+    lv_anim_set_exec_cb(&hop, anim_y_cb);
+    lv_anim_set_values(&hop, 0, -(px * 3) / 4);
+    lv_anim_set_time(&hop, 260);
+    lv_anim_set_playback_time(&hop, 260);
+    lv_anim_set_repeat_delay(&hop, 500);
+    lv_anim_set_path_cb(&hop, lv_anim_path_ease_out);
+    lv_anim_set_repeat_count(&hop, LV_ANIM_REPEAT_INFINITE);
+    lv_anim_start(&hop);
+    return sprite;
+}
+
+static void build_clock(lv_obj_t *t) {
+    lv_obj_align(make_clawd(t, 18), LV_ALIGN_CENTER, 0, -72);
+
+    lblClockTime = make_label(t, &lv_font_montserrat_48, COL_TEXT);
+    lv_obj_align(lblClockTime, LV_ALIGN_CENTER, 0, 78);
+
+    lblClockDate = make_label(t, &lv_font_montserrat_20, COL_MUTED);
+    lv_obj_align(lblClockDate, LV_ALIGN_CENTER, 0, 126);
+}
+
 static void build_setup_layer() {
     setupLayer = lv_obj_create(lv_layer_top());
     lv_obj_set_size(setupLayer, LCD_WIDTH, LCD_HEIGHT);
@@ -410,16 +502,20 @@ void ui_init() {
     tv = lv_tileview_create(scr);
     lv_obj_set_style_bg_color(tv, COL_BG, 0);
     lv_obj_set_scrollbar_mode(tv, LV_SCROLLBAR_MODE_OFF);
-    lv_obj_t *t0 = lv_tileview_add_tile(tv, 0, 0, LV_DIR_RIGHT);
-    lv_obj_t *t1 = lv_tileview_add_tile(tv, 1, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
-    lv_obj_t *t2 = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
-    lv_obj_t *t3 = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
-    lv_obj_t *t4 = lv_tileview_add_tile(tv, 4, 0, LV_DIR_LEFT);
+    // Clock sits left of Usage; the device starts on Usage.
+    lv_obj_t *tClock = lv_tileview_add_tile(tv, 0, 0, LV_DIR_RIGHT);
+    lv_obj_t *t0 = lv_tileview_add_tile(tv, 1, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
+    lv_obj_t *t1 = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
+    lv_obj_t *t2 = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
+    lv_obj_t *t3 = lv_tileview_add_tile(tv, 4, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
+    lv_obj_t *t4 = lv_tileview_add_tile(tv, 5, 0, LV_DIR_LEFT);
+    build_clock(tClock);
     build_usage(t0);
     build_settings(t1);
     build_wifi(t2);
     build_battery(t3);
     build_info(t4);
+    lv_obj_set_tile_id(tv, 1, 0, LV_ANIM_OFF);
 
     build_setup_layer();
 
@@ -571,6 +667,15 @@ void ui_update(const UsageSnapshot &u, const BatteryInfo &b, const NetStatus &n)
     update_battery(b);
     update_info(n);
 
+    time_t now = time(nullptr);
+    if (now > 1700000000) {
+        lv_label_set_text(lblClockTime, fmt_local(now, "%H:%M").c_str());
+        lv_label_set_text(lblClockDate, fmt_local(now, "%A %e %B").c_str());
+    } else {
+        lv_label_set_text(lblClockTime, "--:--");
+        lv_label_set_text(lblClockDate, "Waiting for time");
+    }
+
     String current = n.mode == NET_CONNECTED ? n.ssid : String();
     if (net_saved_version() != wifiListVersion || current != wifiListCurrent) {
         wifiListVersion = net_saved_version();
@@ -605,20 +710,6 @@ void ui_show_power_off() {
 
 // ---------------------------------------------------------------- hourly Clawd
 
-// Clawd, as drawn in Claude Code's welcome banner. Each banner character is a
-// half-block, so one character row = two square pixels here.
-static const char *CLAWD[] = {
-    ".#########.",
-    ".#########.",
-    "##.#####.##",   // eyes
-    "###########",
-    ".#########.",
-    ".#########.",
-    ".#.#...#.#.",   // legs
-    ".#.#...#.#.",
-};
-static const int CLAWD_W = 11, CLAWD_H = 8, PX = 24;
-
 static lv_obj_t *hourly = nullptr;
 static lv_timer_t *hourlyTimer = nullptr;
 
@@ -643,9 +734,6 @@ static void hourly_timer_cb(lv_timer_t *) {
 
 static void hourly_tap_cb(lv_event_t *) { hourly_close(); }
 
-static void anim_y_cb(void *obj, int32_t v) { lv_obj_set_style_translate_y((lv_obj_t *)obj, v, 0); }
-static void anim_h_cb(void *obj, int32_t v) { lv_obj_set_height((lv_obj_t *)obj, v); }
-
 void ui_show_hourly(time_t now) {
     hourly_close();
 
@@ -658,62 +746,7 @@ void ui_show_hourly(time_t now) {
     lv_obj_clear_flag(hourly, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(hourly, hourly_tap_cb, LV_EVENT_CLICKED, NULL);
 
-    lv_obj_t *sprite = lv_obj_create(hourly);
-    lv_obj_set_size(sprite, CLAWD_W * PX, CLAWD_H * PX);
-    lv_obj_set_style_bg_opa(sprite, LV_OPA_TRANSP, 0);
-    lv_obj_set_style_border_width(sprite, 0, 0);
-    lv_obj_set_style_pad_all(sprite, 0, 0);
-    lv_obj_clear_flag(sprite, (lv_obj_flag_t)(LV_OBJ_FLAG_SCROLLABLE | LV_OBJ_FLAG_CLICKABLE));
-    lv_obj_align(sprite, LV_ALIGN_CENTER, 0, -60);
-
-    // One rectangle per horizontal run of pixels keeps the object count low.
-    for (int y = 0; y < CLAWD_H; y++) {
-        for (int x = 0; x < CLAWD_W;) {
-            if (CLAWD[y][x] != '#') { x++; continue; }
-            int x0 = x;
-            while (x < CLAWD_W && CLAWD[y][x] == '#') x++;
-            lv_obj_t *r = lv_obj_create(sprite);
-            lv_obj_remove_style_all(r);
-            lv_obj_set_style_bg_color(r, COL_CLAUDE, 0);
-            lv_obj_set_style_bg_opa(r, LV_OPA_COVER, 0);
-            lv_obj_set_pos(r, x0 * PX, y * PX);
-            lv_obj_set_size(r, (x - x0) * PX, PX);
-        }
-    }
-
-    // Blink: an orange lid over each eye closes briefly.
-    for (int ex : {2, 8}) {
-        lv_obj_t *lid = lv_obj_create(sprite);
-        lv_obj_remove_style_all(lid);
-        lv_obj_set_style_bg_color(lid, COL_CLAUDE, 0);
-        lv_obj_set_style_bg_opa(lid, LV_OPA_COVER, 0);
-        lv_obj_set_pos(lid, ex * PX, 2 * PX);
-        lv_obj_set_size(lid, PX, 0);
-        lv_anim_t a;
-        lv_anim_init(&a);
-        lv_anim_set_var(&a, lid);
-        lv_anim_set_exec_cb(&a, anim_h_cb);
-        lv_anim_set_values(&a, 0, PX);
-        lv_anim_set_time(&a, 90);
-        lv_anim_set_playback_time(&a, 90);
-        lv_anim_set_delay(&a, 1400);
-        lv_anim_set_repeat_delay(&a, 1800);
-        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
-        lv_anim_start(&a);
-    }
-
-    // Gentle hop.
-    lv_anim_t hop;
-    lv_anim_init(&hop);
-    lv_anim_set_var(&hop, sprite);
-    lv_anim_set_exec_cb(&hop, anim_y_cb);
-    lv_anim_set_values(&hop, 0, -18);
-    lv_anim_set_time(&hop, 260);
-    lv_anim_set_playback_time(&hop, 260);
-    lv_anim_set_repeat_delay(&hop, 500);
-    lv_anim_set_path_cb(&hop, lv_anim_path_ease_out);
-    lv_anim_set_repeat_count(&hop, LV_ANIM_REPEAT_INFINITE);
-    lv_anim_start(&hop);
+    lv_obj_align(make_clawd(hourly, 24), LV_ALIGN_CENTER, 0, -60);
 
     lv_obj_t *clock = make_label(hourly, &lv_font_montserrat_48, COL_TEXT);
     lv_label_set_text(clock, fmt_local(now, "%H:%M").c_str());
