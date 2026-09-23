@@ -47,6 +47,7 @@ static String lastQr;
 static lv_obj_t *wifiList, *arcWifi, *lblWifiCap;
 static std::vector<String> wifiSsids;   // backs the delete buttons' user_data
 static uint32_t wifiListVersion = UINT32_MAX;
+static const std::vector<String> *wifiDemo = nullptr;   // screenshot mode
 static String wifiListCurrent;
 static lv_obj_t *armedBtn = nullptr;     // first tap arms a delete, second confirms
 static lv_timer_t *disarmTimer = nullptr;
@@ -348,7 +349,7 @@ static void forget_cb(lv_event_t *e) {
 static void rebuild_wifi_list(const NetStatus &n) {
     disarm();
     lv_obj_clean(wifiList);
-    wifiSsids = net_saved_ssids();
+    wifiSsids = wifiDemo ? *wifiDemo : net_saved_ssids();
     if (wifiSsids.empty()) {
         lv_obj_t *l = make_label(wifiList, &lv_font_montserrat_20, COL_MUTED);
         lv_label_set_text(l, "No saved networks");
@@ -803,7 +804,7 @@ static void update_usage(const UsageSnapshot &u, const BatteryInfo &b, const Net
     else if (strcmp(u.overallStatus, "rejected") == 0) foot = "Limit reached";
     else if (u.fetchedAt) {
         long ago = now - u.fetchedAt;
-        foot = ago < 60 ? String("Updated just now") : "Updated " + fmt_duration(ago) + " ago";
+        foot = ago < 60 ? String("Updated just now") : "Updated " + fmt_duration(ago / 60 * 60 - 59) + " ago";  // floor to whole minutes
         if (u.overage.valid && u.overage.pct > 0) foot += "\nExtra usage " + String((int)roundf(u.overage.pct)) + "%";
     }
     lv_label_set_text(lblFooter, foot.c_str());
@@ -1123,4 +1124,80 @@ static void boot_splash_update(const UsageSnapshot &u, const NetStatus &n) {
     }
     const char *st = n.mode == NET_CONNECTED ? "Fetching usage..." : "Connecting to Wi-Fi...";
     if (strcmp(lv_label_get_text(bootStatus), st) != 0) lv_label_set_text(bootStatus, st);
+}
+
+// ---------------------------------------------------------------- screenshots
+// Serial 's': renders every page with demo data (no real SSIDs/IPs/usage) and
+// streams each as raw RGB565: "SNAP <name> <w> <h>\n" + w*h*2 bytes + "\nEND\n".
+// tools/screenshots.py turns them into PNGs for the README.
+
+static void send_snapshot(lv_obj_t *obj, const char *name) {
+    for (int i = 0; i < 5; i++) lv_timer_handler();
+    lv_img_dsc_t *img = lv_snapshot_take(obj, LV_IMG_CF_TRUE_COLOR);
+    if (!img) {
+        Serial.printf("SNAPFAIL %s\n", name);
+        return;
+    }
+    Serial.printf("SNAP %s %d %d\n", name, img->header.w, img->header.h);
+    // Only write what the USB FIFO can take right now, so nothing is dropped.
+    const uint8_t *p = img->data;
+    size_t left = img->data_size;
+    uint32_t stall = millis();
+    while (left && millis() - stall < 5000) {
+        int room = Serial.availableForWrite();
+        if (room <= 0) {
+            delay(1);
+            continue;
+        }
+        size_t n = Serial.write(p, min<size_t>(left, room));
+        p += n;
+        left -= n;
+        if (n) stall = millis();
+    }
+    Serial.print("\nEND\n");
+    Serial.flush();
+    lv_snapshot_free(img);
+}
+
+void ui_capture_screens() {
+    time_t now = time(nullptr);
+    UsageSnapshot u = {};
+    u.state = FETCH_OK;
+    u.session = {true, 42.0f, now + 2 * 3600 + 13 * 60, "allowed"};
+    u.weekly = {true, 67.0f, now + 3 * 86400 + 5 * 3600, "allowed"};
+    strlcpy(u.overallStatus, "allowed", sizeof(u.overallStatus));
+    u.fetchedAt = now - 60;
+    BatteryInfo b = {true, false, false, false, 78, 3981, 0, 3962, 36.5f, "Not charging"};
+    NetStatus n;
+    n.mode = NET_CONNECTED;
+    n.webPortal = false;
+    n.apName = "Claude-Gadget-0F35";
+    n.ssid = "HomeWiFi";
+    n.ip = "192.168.1.42";
+    n.rssi = -58;
+    n.saved = 3;
+    static const std::vector<String> demoSsids = {"HomeWiFi", "Office", "Phone Hotspot"};
+    wifiDemo = &demoSsids;
+    wifiListVersion = UINT32_MAX;
+
+    const char *names[] = {"clock", "usage", "settings", "sound", "wifi", "battery", "device"};
+    for (int i = 0; i < 7; i++) {
+        lv_obj_set_tile_id(tv, i, 0, LV_ANIM_OFF);
+        ui_update(u, b, n);
+        send_snapshot(lv_scr_act(), names[i]);
+    }
+
+    // Setup screens (on the top layer).
+    NetStatus ap = n;
+    ap.mode = NET_AP_PORTAL;
+    ui_update(u, b, ap);
+    send_snapshot(setupLayer, "setup-hotspot");
+    lv_obj_add_flag(setupLayer, LV_OBJ_FLAG_HIDDEN);
+
+    // Back to live data.
+    wifiDemo = nullptr;
+    wifiListVersion = UINT32_MAX;
+    lastQr = "";
+    lv_obj_set_tile_id(tv, 1, 0, LV_ANIM_OFF);
+    Serial.println("SNAPDONE");
 }

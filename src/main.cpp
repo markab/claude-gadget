@@ -215,6 +215,10 @@ void setup() {
     Wire.begin(I2C_SDA, I2C_SCL, 400000);
 
     settings_load();
+    // Apply the timezone now: the RTC keeps time across resets, so the clock is
+    // valid before Wi-Fi/NTP and would otherwise show UTC until then.
+    setenv("TZ", settings.tz.c_str(), 1);
+    tzset();
     power_init();
     sound_begin();
     display_init();
@@ -270,6 +274,16 @@ void loop() {
             sound_play(SND_HOURLY);
         } else if (c == 'a') {
             sound_play(SND_ALERT);
+        } else if (c == 's') {
+            ui_capture_screens();
+        } else if (c == 't') {
+            time_t t = time(nullptr);
+            struct tm lt;
+            localtime_r(&t, &lt);
+            char buf[32];
+            strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S %Z", &lt);
+            Serial.printf("[time] TZ='%s' setting='%s' local=%s\n", getenv("TZ") ? getenv("TZ") : "(unset)",
+                          settings.tz.c_str(), buf);
         }
     }
 
