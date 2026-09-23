@@ -9,9 +9,9 @@ Inspired by [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter), which u
 ## Screens (swipe left/right)
 
 1. **Usage**: outer ring is the 5-hour session, inner ring is the week. Shows the session reset countdown, the weekly reset day and time. Rings turn amber at 75% and red at 90%. The bottom shows when it last updated, then the clock, Wi-Fi and battery.
-2. **Battery**: charge %, charging state (trickle/CC/CV/full), battery, USB and system voltages, and PMU temperature.
-3. **Device**: Wi-Fi network, signal, IP, poll interval, uptime, free memory, firmware version.
-4. **Settings**: brightness and auto-dim time sliders (15 s – 30 min, or never). Saved across reboots.
+2. **Settings**: sliders for normal brightness, dimmed brightness (previewed on the panel while you drag) and auto-dim time (15 s – 30 min, or never). Saved across reboots.
+3. **Battery**: charge %, charging state (trickle/CC/CV/full), battery, USB and system voltages, and PMU temperature.
+4. **Device**: Wi-Fi network, signal, IP, poll interval, uptime, free memory, firmware version.
 
 ## Controls
 
@@ -25,7 +25,7 @@ Inspired by [Clawdmeter](https://github.com/HermannBjorgvin/Clawdmeter), which u
 
 Power behaviour:
 - **On battery**, the screen turns off after the auto-dim time (default 60 s) and usage polls slow to 3× the normal interval.
-- **On USB**, the screen dims instead of turning off.
+- **On USB**, the screen drops to the dimmed brightness instead of turning off.
 - The device powers itself off after 30 s below 3.3 V.
 
 ## Build & flash
@@ -40,6 +40,10 @@ pio run -t upload && pio device monitor
 2. Power on the gadget. It shows a QR code for the **Claude-Gadget-XXXX** hotspot. Join it; the setup page opens (otherwise go to `192.168.4.1`).
 3. Choose your Wi-Fi network, paste the token, and check the timezone. The default is UK: `GMT0BST,M3.5.0/1,M10.5.0`.
 4. Save. The gadget joins your Wi-Fi and shows usage within a few seconds.
+
+The gadget remembers the last 5 Wi-Fi networks it joined. When it boots, or loses its connection (e.g. you move location), it joins the strongest one in range. If none are in range for 90 s, the setup hotspot opens so you can add another.
+
+To add a network while connected, hold BOOT for 3 s and use the hotspot. Leave the token field blank to keep the saved token; it's stored separately from the Wi-Fi credentials.
 
 If Wi-Fi is already configured but no token is saved, the screen shows a QR code for `http://<device-ip>/param` so you can enter it over your LAN.
 

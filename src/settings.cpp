@@ -28,9 +28,11 @@ void settings_load() {
     settings.pollMins   = p.getUShort("poll", 5);
     settings.brightness = p.getUChar("bright", 180);
     settings.dimSecs    = p.getUShort("dim", 60);
+    settings.dimBrightness = p.getUChar("dimbr", 25);
     p.end();
     if (settings.pollMins < 1) settings.pollMins = 1;
     if (settings.brightness < 10) settings.brightness = 10;
+    if (settings.dimBrightness < 2) settings.dimBrightness = 2;
 }
 
 void settings_save() {
@@ -41,5 +43,6 @@ void settings_save() {
     p.putUShort("poll", settings.pollMins);
     p.putUChar("bright", settings.brightness);
     p.putUShort("dim", settings.dimSecs);
+    p.putUChar("dimbr", settings.dimBrightness);
     p.end();
 }

@@ -14,6 +14,7 @@ struct NetStatus {
     String ssid;
     String ip;
     int rssi;
+    int saved;          // number of remembered networks
 };
 
 void net_begin();

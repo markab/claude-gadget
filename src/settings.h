@@ -6,7 +6,8 @@ struct Settings {
     String token;        // Claude OAuth token from `claude setup-token`
     String tz;           // POSIX TZ string, e.g. "GMT0BST,M3.5.0/1,M10.5.0"
     uint16_t pollMins;   // minutes between usage polls
-    uint8_t brightness;  // 10..255
+    uint8_t brightness;  // 10..255, normal screen brightness
+    uint8_t dimBrightness; // 2..255, brightness when idle on USB
     uint16_t dimSecs;    // screen off after this many idle seconds on battery (0 = never)
 };
 

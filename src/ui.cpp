@@ -33,7 +33,7 @@ static lv_obj_t *setupLayer, *setupTitle, *setupBody, *setupQr;
 static lv_obj_t *toast;
 static String lastQr;
 // Settings tile
-static lv_obj_t *sldBright, *lblBright, *sldDim, *lblDim;
+static lv_obj_t *sldBright, *lblBright, *sldDimLevel, *lblDimLevel, *sldDim, *lblDim;
 
 // ---------------------------------------------------------------- helpers
 
@@ -182,12 +182,28 @@ static void build_info(lv_obj_t *t) {
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -56);
 }
 
+static int to_pct(int v) { return (v * 100 + 127) / 255; }
+
 static void bright_cb(lv_event_t *e) {
     int v = lv_slider_get_value(sldBright);
-    lv_label_set_text_fmt(lblBright, "Brightness  %d%%", (v * 100 + 127) / 255);
+    lv_label_set_text_fmt(lblBright, "Brightness  %d%%", to_pct(v));
     settings.brightness = v;
     display_set_brightness(v);
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) settings_save();  // only write flash on release
+}
+
+// Previews the dim level on the panel while dragging, then restores normal brightness.
+static void dim_level_cb(lv_event_t *e) {
+    int v = lv_slider_get_value(sldDimLevel);
+    lv_label_set_text_fmt(lblDimLevel, "Dimmed  %d%%", to_pct(v));
+    settings.dimBrightness = v;
+    lv_event_code_t code = lv_event_get_code(e);
+    if (code == LV_EVENT_RELEASED) {
+        display_set_brightness(settings.brightness);
+        settings_save();
+    } else if (lv_slider_is_dragged(sldDimLevel) || code == LV_EVENT_PRESSED) {
+        display_set_brightness(v);
+    }
 }
 
 static void dim_cb(lv_event_t *e) {
@@ -213,19 +229,28 @@ static lv_obj_t *make_slider(lv_obj_t *parent, lv_coord_t y, lv_color_t color) {
 static void build_settings(lv_obj_t *t) {
     lv_obj_t *cap = make_label(t, &lv_font_montserrat_16, COL_MUTED);
     lv_label_set_text(cap, "SETTINGS");
-    lv_obj_align(cap, LV_ALIGN_TOP_MID, 0, 70);
+    lv_obj_align(cap, LV_ALIGN_TOP_MID, 0, 58);
 
     lblBright = make_label(t, &lv_font_montserrat_20, COL_TEXT);
-    lv_obj_align(lblBright, LV_ALIGN_CENTER, 0, -92);
-    sldBright = make_slider(t, -52, COL_CLAUDE);
+    lv_obj_align(lblBright, LV_ALIGN_CENTER, 0, -118);
+    sldBright = make_slider(t, -84, COL_CLAUDE);
     lv_slider_set_range(sldBright, 10, 255);
     lv_slider_set_value(sldBright, settings.brightness, LV_ANIM_OFF);
     lv_obj_add_event_cb(sldBright, bright_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(sldBright, bright_cb, LV_EVENT_RELEASED, NULL);
 
+    lblDimLevel = make_label(t, &lv_font_montserrat_20, COL_TEXT);
+    lv_obj_align(lblDimLevel, LV_ALIGN_CENTER, 0, -34);
+    sldDimLevel = make_slider(t, 0, COL_MUTED);
+    lv_slider_set_range(sldDimLevel, 2, 255);
+    lv_slider_set_value(sldDimLevel, settings.dimBrightness, LV_ANIM_OFF);
+    lv_obj_add_event_cb(sldDimLevel, dim_level_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(sldDimLevel, dim_level_cb, LV_EVENT_PRESSED, NULL);
+    lv_obj_add_event_cb(sldDimLevel, dim_level_cb, LV_EVENT_RELEASED, NULL);
+
     lblDim = make_label(t, &lv_font_montserrat_20, COL_TEXT);
-    lv_obj_align(lblDim, LV_ALIGN_CENTER, 0, 28);
-    sldDim = make_slider(t, 68, COL_WEEK);
+    lv_obj_align(lblDim, LV_ALIGN_CENTER, 0, 50);
+    sldDim = make_slider(t, 84, COL_WEEK);
     lv_slider_set_range(sldDim, 0, N_DIM_STEPS - 1);
     int idx = 0;
     for (int i = 0; i < N_DIM_STEPS; i++)
@@ -236,9 +261,10 @@ static void build_settings(lv_obj_t *t) {
 
     lv_obj_t *hint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
     lv_label_set_text(hint, "Idle on USB: dims\nIdle on battery: screen off");
-    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -60);
+    lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -56);
 
-    // Populate the labels.
+    // Populate the labels (dim-level first: its handler must not leave the panel dimmed).
+    lv_event_send(sldDimLevel, LV_EVENT_VALUE_CHANGED, NULL);
     lv_event_send(sldBright, LV_EVENT_VALUE_CHANGED, NULL);
     lv_event_send(sldDim, LV_EVENT_VALUE_CHANGED, NULL);
 }
@@ -281,9 +307,9 @@ void ui_init() {
     lv_obj_t *t2 = lv_tileview_add_tile(tv, 2, 0, LV_DIR_LEFT | LV_DIR_RIGHT);
     lv_obj_t *t3 = lv_tileview_add_tile(tv, 3, 0, LV_DIR_LEFT);
     build_usage(t0);
-    build_battery(t1);
-    build_info(t2);
-    build_settings(t3);
+    build_settings(t1);
+    build_battery(t2);
+    build_info(t3);
 
     build_setup_layer();
 
@@ -421,6 +447,7 @@ static void update_info(const NetStatus &n) {
     } else {
         s += "Wi-Fi connecting...\n";
     }
+    s += "Saved Wi-Fi networks: " + String(n.saved) + "\n";
     s += "Refresh every " + String(settings.pollMins) + " min\n";
     s += "Up " + fmt_duration(up) + "\n";
     s += "Heap " + String(ESP.getFreeHeap() / 1024) + " KB \xE2\x80\xA2 PSRAM " + String(ESP.getFreePsram() / 1024) + " KB\n";

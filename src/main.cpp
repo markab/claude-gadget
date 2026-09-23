@@ -20,7 +20,6 @@
 #include "claude.h"
 #include "ui.h"
 
-static const uint8_t DIM_BRIGHTNESS = 25;          // idle brightness while on USB
 static const uint16_t LOW_BATT_OFF_MV = 3300;      // auto power-off threshold
 static const uint32_t BOOT_HOLD_MS = 3000;
 
@@ -98,7 +97,7 @@ static void handle_idle(const BatteryInfo &b) {
     if (b.vbus) {
         // On USB: dim instead of switching off (a desk gadget should stay readable).
         if (idle >= limit && !dimmed) {
-            display_set_brightness(DIM_BRIGHTNESS);
+            display_set_brightness(settings.dimBrightness);
             dimmed = true;
         } else if (idle < limit && dimmed) {
             display_set_brightness(settings.brightness);
