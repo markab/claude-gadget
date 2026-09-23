@@ -17,6 +17,7 @@ Built for the [Waveshare ESP32-S3-Touch-AMOLED-1.75C](https://docs.waveshare.com
 - [First-time setup](#first-time-setup)
 - [Using it](#using-it)
 - [Screens and settings](#screens-and-settings)
+- [Updates](#updates)
 - [Power and battery](#power-and-battery)
 - [Wi-Fi](#wi-fi)
 - [Troubleshooting](#troubleshooting)
@@ -153,8 +154,21 @@ The time with seconds, and the date.
 - **Outer ring:** internal memory in use.
 - **Inner ring:** PSRAM in use.
 - Also the Wi-Fi network, signal, IP address, number of saved networks, uptime and firmware version.
+- **Update pill:** when a newer release is available, the firmware version is replaced by an **Update to x.y.z** pill. See [Updates](#updates).
 
 <br clear="right">
+
+## Updates
+
+The gadget checks for a new release at startup and then every 6 hours, while it's on Wi-Fi.
+
+- When a newer version is available, the firmware line on the **Device** page becomes an orange **Update to x.y.z** pill.
+- Tap the pill to download and install the update over Wi-Fi. A progress ring shows the download. When it's finished, the gadget restarts on the new version.
+- Your Wi-Fi networks, token and settings are kept.
+- To update, the gadget must be plugged into USB or have at least 30% battery.
+- Don't power it off while updating. If an update fails (e.g. Wi-Fi drops), the gadget keeps running the current version and you can try again.
+
+You can also update from the [web installer](https://markab.github.io/claude-gadget/) over USB without erasing.
 
 ## Power and battery
 
@@ -224,7 +238,7 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-The [Release workflow](.github/workflows/release.yml) builds the firmware with that version and attaches the factory and app images to a GitHub Release. It also deploys the web installer (`docs/` plus the firmware) to GitHub Pages. You can also run it from the Actions tab to redeploy the site.
+The [Release workflow](.github/workflows/release.yml) builds the firmware with that version and attaches the factory and app images to a GitHub Release. It also deploys the web installer (`docs/` plus the firmware) to GitHub Pages. Gadgets pick up the new version from the Pages site's `manifest.json` and download `firmware/firmware.bin` from there, so OTA updates start as soon as the deploy finishes. You can also run it from the Actions tab to redeploy the site.
 
 ### Code layout
 
@@ -236,6 +250,7 @@ The [Release workflow](.github/workflows/release.yml) builds the firmware with t
 | `src/power.cpp` | AXP2101 power chip: PWR button, charging, voltages, shutdown |
 | `src/display.cpp` | CO5300 AMOLED, CST9217 touch, LVGL setup |
 | `src/sound.cpp` | ES8311 codec and tone synthesis |
+| `src/ota.cpp` | Update check and over-the-air install |
 | `src/ui.cpp` | All screens |
 | `src/settings.cpp` | Settings stored in flash |
 | `src/portal_theme.h` | Setup portal styling |

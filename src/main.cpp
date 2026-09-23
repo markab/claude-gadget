@@ -22,6 +22,7 @@
 #include "claude.h"
 #include "ui.h"
 #include "sound.h"
+#include "ota.h"
 
 static const uint16_t LOW_BATT_OFF_MV = 3300;      // auto power-off threshold
 static const uint32_t BOOT_HOLD_MS = 3000;
@@ -111,6 +112,24 @@ static void check_quota_alert(const UsageSnapshot &u) {
         ui_flash_message(msg);
         sound_play(SND_ALERT);
         break;  // one alert at a time
+    }
+}
+
+// Device page "Update" pill: download and flash the latest release, then restart.
+static void handle_update_request() {
+    if (!ui_take_update_request() || !ota_update_available()) return;
+    BatteryInfo b = power_battery();
+    if (!b.vbus && b.present && b.percent < 30) {
+        ui_flash_message(LV_SYMBOL_BATTERY_1 " Charge to 30% or plug in to update");
+        return;
+    }
+    String v = ota_latest_version();
+    ui_show_updating(v.c_str());
+    bool ok = ota_run(ui_set_update_progress);
+    ui_show_update_result(ok, ok ? "Restarting..." : ota_last_error().c_str());
+    if (ok) {
+        Serial.flush();
+        ESP.restart();
     }
 }
 
@@ -230,6 +249,7 @@ void setup() {
     lv_timer_handler();
 
     claude_start();
+    ota_begin();
     Serial.printf("[boot] free internal %u KB, PSRAM %u/%u KB\n", heap_caps_get_free_size(MALLOC_CAP_INTERNAL) / 1024,
                   ESP.getFreePsram() / 1024, ESP.getPsramSize() / 1024);
     net_begin();   // blocks up to ~15 s while it tries saved Wi-Fi
@@ -286,6 +306,8 @@ void loop() {
                           settings.tz.c_str(), buf);
         }
     }
+
+    handle_update_request();
 
     UsageSnapshot u = claude_snapshot();
     if (now - lastUi >= 1000 || u.seq != lastSeq) {

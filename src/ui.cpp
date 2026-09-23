@@ -3,6 +3,7 @@
 #include "settings.h"
 #include "display.h"
 #include "sound.h"
+#include "ota.h"
 #include <lvgl.h>
 #include <time.h>
 #include <sys/time.h>
@@ -33,7 +34,8 @@ static lv_obj_t *lblStatusBar, *lblSessionPct, *lblSessionReset, *lblWeekPct, *l
 static lv_obj_t *arcBatt, *lblBattPct, *lblBattState, *lblBattDetail;
 
 // Info tile
-static lv_obj_t *lblInfo, *arcRam, *arcPsram;
+static lv_obj_t *lblInfo, *arcRam, *arcPsram, *lblFw, *btnUpdate, *lblUpdate;
+static bool updateRequested = false;
 static const uint16_t POLL_STEPS[] = {1, 2, 3, 5, 10, 15, 30, 60};   // minutes
 static const int N_POLL_STEPS = sizeof(POLL_STEPS) / sizeof(POLL_STEPS[0]);
 
@@ -203,7 +205,24 @@ static void build_info(lv_obj_t *t) {
 
     lblInfo = make_label(t, &lv_font_montserrat_20, COL_TEXT);
     lv_obj_set_style_text_line_space(lblInfo, 8, 0);
-    lv_obj_align(lblInfo, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(lblInfo, LV_ALIGN_CENTER, 0, -18);
+
+    // Firmware version, replaced by an "Update" pill when a newer release exists.
+    lblFw = make_label(t, &lv_font_montserrat_20, COL_TEXT);
+    lv_label_set_text(lblFw, "Firmware " FW_VERSION);
+    lv_obj_align(lblFw, LV_ALIGN_CENTER, 0, 96);
+
+    btnUpdate = lv_btn_create(t);
+    lv_obj_set_height(btnUpdate, 44);
+    lv_obj_set_style_pad_hor(btnUpdate, 22, 0);
+    lv_obj_set_style_radius(btnUpdate, 22, 0);
+    lv_obj_set_style_bg_color(btnUpdate, COL_CLAUDE, 0);
+    lv_obj_set_style_shadow_width(btnUpdate, 0, 0);
+    lv_obj_align(btnUpdate, LV_ALIGN_CENTER, 0, 100);
+    lblUpdate = make_label(btnUpdate, &lv_font_montserrat_20, lv_color_hex(0x1F1E1D));
+    lv_obj_center(lblUpdate);
+    lv_obj_add_flag(btnUpdate, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_event_cb(btnUpdate, [](lv_event_t *) { updateRequested = true; }, LV_EVENT_CLICKED, NULL);
 
 
     lv_obj_t *hint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
@@ -858,9 +877,18 @@ static void update_info(const NetStatus &n) {
     lv_arc_set_value(arcPsram, psPct);
     lv_obj_set_style_arc_color(arcRam, level_color(ramPct, COL_CLAUDE), LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(arcPsram, level_color(psPct, COL_WEEK), LV_PART_INDICATOR);
-    s += "RAM " + String(ramPct) + "% \xE2\x80\xA2 PSRAM " + String(psPct) + "%\n";
-    s += "Firmware " FW_VERSION;
+    s += "RAM " + String(ramPct) + "% \xE2\x80\xA2 PSRAM " + String(psPct) + "%";
     lv_label_set_text(lblInfo, s.c_str());
+
+    if (ota_update_available()) {
+        String t = String(LV_SYMBOL_DOWNLOAD "  Update to ") + ota_latest_version();
+        if (strcmp(lv_label_get_text(lblUpdate), t.c_str()) != 0) lv_label_set_text(lblUpdate, t.c_str());
+        lv_obj_add_flag(lblFw, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_clear_flag(btnUpdate, LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_clear_flag(lblFw, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_add_flag(btnUpdate, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 static void boot_splash_update(const UsageSnapshot &u, const NetStatus &n);
@@ -1200,4 +1228,46 @@ void ui_capture_screens() {
     lastQr = "";
     lv_obj_set_tile_id(tv, 1, 0, LV_ANIM_OFF);
     Serial.println("SNAPDONE");
+}
+
+// ---------------------------------------------------------------- OTA update screen
+
+bool ui_take_update_request() {
+    bool r = updateRequested;
+    updateRequested = false;
+    return r;
+}
+
+void ui_show_updating(const char *version) {
+    power_layer_create("");
+    lv_label_set_text_fmt(powerLabel, "Updating to %s", version);
+    powerRing = make_arc(powerLayer, 452, 14, COL_CLAUDE);
+    lv_arc_set_bg_angles(powerRing, 0, 360);
+    lv_arc_set_rotation(powerRing, 270);
+    lv_arc_set_range(powerRing, 0, 100);
+    lv_arc_set_value(powerRing, 0);
+    bootStatus = make_label(powerLayer, &lv_font_montserrat_16, COL_MUTED);
+    lv_label_set_text(bootStatus, "Don't power off");
+    lv_obj_align(bootStatus, LV_ALIGN_CENTER, 0, 140);
+    lv_obj_move_foreground(powerLayer);
+    pump_ui(50);
+}
+
+void ui_set_update_progress(int pct) {
+    static int last = -1;
+    if (!powerRing || pct == last) return;
+    last = pct;
+    lv_arc_set_value(powerRing, pct);
+    lv_label_set_text_fmt(bootStatus, "%d%%  " LV_SYMBOL_BULLET "  Don't power off", pct);
+    lv_timer_handler();
+}
+
+void ui_show_update_result(bool ok, const char *msg) {
+    if (!powerLayer) return;
+    lv_label_set_text(powerLabel, ok ? "Update installed" : "Update failed");
+    lv_obj_set_style_text_color(powerLabel, ok ? COL_OK : COL_CRIT, 0);
+    lv_label_set_text(bootStatus, msg);
+    if (ok) lv_arc_set_value(powerRing, 100);
+    pump_ui(ok ? 1200 : 3500);
+    if (!ok) power_layer_delete();
 }
