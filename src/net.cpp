@@ -11,7 +11,6 @@ static WiFiManager wm;
 static NetMode mode = NET_CONNECTING;
 static String apName;
 static bool wasConnected = false;
-static char pollBuf[6];
 
 // ---- Known networks: WiFiManager only remembers the last one, so we keep our
 // own most-recently-used list and join whichever is strongest in range.
@@ -136,7 +135,6 @@ static void roam_step() {
 static WiFiManagerParameter pToken("token", "Claude token (from <code>claude setup-token</code>, blank = keep current)",
                                    "", 255, "type='password' autocomplete='off'");
 static WiFiManagerParameter pTz("tz", "Timezone (POSIX TZ string)", "", 63);
-static WiFiManagerParameter pPoll("poll", "Refresh every N minutes", "", 4, "type='number' min='1' max='120'");
 
 static void apply_time() {
     configTzTime(settings.tz.c_str(), "pool.ntp.org", "time.google.com");
@@ -151,8 +149,6 @@ static void on_save_params() {
     tz.trim();
     if (!tz.isEmpty()) settings.tz = tz;
 
-    int poll = atoi(pPoll.getValue());
-    if (poll >= 1 && poll <= 120) settings.pollMins = poll;
 
     settings_save();
     apply_time();
@@ -189,12 +185,9 @@ void net_begin() {
     WiFi.setHostname("claude-gadget");
 
     pTz.setValue(settings.tz.c_str(), 63);
-    snprintf(pollBuf, sizeof(pollBuf), "%u", settings.pollMins);
-    pPoll.setValue(pollBuf, 4);
 
     wm.addParameter(&pToken);
     wm.addParameter(&pTz);
-    wm.addParameter(&pPoll);
     wm.setSaveParamsCallback(on_save_params);
     wm.setBreakAfterConfig(true);          // save params even if the Wi-Fi join fails
     wm.setConfigPortalBlocking(false);

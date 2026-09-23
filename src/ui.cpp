@@ -33,7 +33,9 @@ static lv_obj_t *lblStatusBar, *lblSessionPct, *lblSessionReset, *lblWeekPct, *l
 static lv_obj_t *arcBatt, *lblBattPct, *lblBattState, *lblBattDetail;
 
 // Info tile
-static lv_obj_t *lblInfo, *arcRam, *arcPsram;
+static lv_obj_t *lblInfo, *arcRam, *arcPsram, *sldPoll, *lblPoll;
+static const uint16_t POLL_STEPS[] = {1, 2, 3, 5, 10, 15, 30, 60};   // minutes
+static const int N_POLL_STEPS = sizeof(POLL_STEPS) / sizeof(POLL_STEPS[0]);
 
 // Overlays
 static lv_obj_t *setupLayer, *setupTitle, *setupBody, *setupQr;
@@ -188,6 +190,17 @@ static void build_battery(lv_obj_t *t) {
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -46);
 }
 
+static lv_obj_t *make_slider(lv_obj_t *parent, lv_coord_t y, lv_color_t color);
+
+static void poll_cb(lv_event_t *e) {
+    settings.pollMins = POLL_STEPS[lv_slider_get_value(sldPoll)];
+    lv_label_set_text_fmt(lblPoll, "Refresh every  %u min", settings.pollMins);
+    if (lv_event_get_code(e) == LV_EVENT_RELEASED) {
+        settings_save();
+        claude_refresh_now();   // restart the poll timer with the new interval
+    }
+}
+
 static void build_info(lv_obj_t *t) {
     arcRam = make_arc(t, 452, 20, COL_CLAUDE);   // internal RAM (heap) in use
     arcPsram = make_arc(t, 396, 12, COL_WEEK);   // PSRAM in use
@@ -200,7 +213,20 @@ static void build_info(lv_obj_t *t) {
 
     lblInfo = make_label(t, &lv_font_montserrat_20, COL_TEXT);
     lv_obj_set_style_text_line_space(lblInfo, 8, 0);
-    lv_obj_align(lblInfo, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_align(lblInfo, LV_ALIGN_CENTER, 0, -36);
+
+    lblPoll = make_label(t, &lv_font_montserrat_20, COL_TEXT);
+    lv_obj_align(lblPoll, LV_ALIGN_CENTER, 0, 84);
+    sldPoll = make_slider(t, 116, COL_CLAUDE);
+    lv_obj_set_width(sldPoll, 240);
+    lv_slider_set_range(sldPoll, 0, N_POLL_STEPS - 1);
+    int idx = 0;
+    for (int i = 0; i < N_POLL_STEPS; i++)
+        if (POLL_STEPS[i] <= settings.pollMins) idx = i;
+    lv_slider_set_value(sldPoll, idx, LV_ANIM_OFF);
+    lv_obj_add_event_cb(sldPoll, poll_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_add_event_cb(sldPoll, poll_cb, LV_EVENT_RELEASED, NULL);
+    lv_label_set_text_fmt(lblPoll, "Refresh every  %u min", POLL_STEPS[idx]);
 
     lv_obj_t *hint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
     lv_label_set_text(hint, "Hold BOOT 3s for Wi-Fi / token setup");
@@ -814,7 +840,6 @@ static void update_info(const NetStatus &n) {
         s += "Wi-Fi connecting...\n";
     }
     s += "Saved Wi-Fi networks: " + String(n.saved) + "\n";
-    s += "Refresh every " + String(settings.pollMins) + " min\n";
     s += "Up " + fmt_duration(up) + "\n";
     size_t ramTotal = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
     size_t ramFree = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);

@@ -16,7 +16,7 @@ It starts on Usage. Swipe right from Usage for the clock; swipe left for the res
 3. **Sound**: sound on/off, volume (5% steps; plays a preview blip when you let go), and a low-quota alert threshold (off, or 5–50% left).
 4. **Wi-Fi**: outer ring shows signal strength of the current network. Saved networks are listed, with the connected one highlighted. Tap its ✕ twice to forget one.
 5. **Battery**: charge %, charging state (trickle/CC/CV/full), battery, USB and system voltages, and PMU temperature.
-6. **Device**: outer ring is internal RAM (heap) in use, inner ring is PSRAM in use. Also Wi-Fi network, signal, IP, poll interval, uptime and firmware version.
+6. **Device**: outer ring is internal RAM (heap) in use, inner ring is PSRAM in use. Also Wi-Fi network, signal, IP, uptime and firmware version, and a slider for how often usage refreshes (1–60 min, default 5).
 
 On the hour, Clawd hops onto the screen with the time and date for 10 s (tap to dismiss). This only happens if the screen is on. To preview it, send `h` over the serial monitor.
 
