@@ -1,0 +1,104 @@
+name: Release
+
+# Push a version tag (e.g. `git tag v1.0.0 && git push origin v1.0.0`) to build the
+# firmware, publish a GitHub Release, and deploy the web installer to GitHub Pages.
+# Can also be run by hand from the Actions tab to redeploy the site.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # create the release
+  pages: write      # deploy the site
+  id-token: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.platformio
+            .pio/libdeps
+          key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
+
+      - name: Install PlatformIO
+        run: pip install --upgrade platformio
+
+      - name: Build firmware
+        env:
+          FW_VERSION: ${{ github.ref_name }}
+        run: pio run -e amoled_175c
+
+      - name: Package firmware and site
+        run: |
+          set -euo pipefail
+          VERSION="${GITHUB_REF_NAME#v}"
+          BUILD=.pio/build/amoled_175c
+          BOOT_APP0=$(find ~/.platformio/packages/framework-arduinoespressif32/tools/partitions -name boot_app0.bin | head -1)
+
+          # Release assets
+          mkdir -p dist
+          cp "$BUILD/firmware.factory.bin" "dist/claude-gadget-$VERSION-factory.bin"   # full image, flash at 0x0 (erases settings)
+          cp "$BUILD/firmware.bin"         "dist/claude-gadget-$VERSION-app.bin"       # app only, flash at 0x10000
+
+          # Web installer: docs/ plus firmware parts. Parts are flashed separately so
+          # the NVS partition (0x9000, Wi-Fi + token + settings) survives updates.
+          mkdir -p site/firmware
+          cp -r docs/. site/
+          cp "$BUILD/bootloader.bin" "$BUILD/partitions.bin" "$BUILD/firmware.bin" site/firmware/
+          cp "$BOOT_APP0" site/firmware/boot_app0.bin
+          cat > site/manifest.json <<EOF
+          {
+            "name": "Claude Gadget",
+            "version": "$VERSION",
+            "new_install_prompt_erase": true,
+            "builds": [
+              {
+                "chipFamily": "ESP32-S3",
+                "parts": [
+                  { "path": "firmware/bootloader.bin", "offset": 0 },
+                  { "path": "firmware/partitions.bin", "offset": 32768 },
+                  { "path": "firmware/boot_app0.bin", "offset": 57344 },
+                  { "path": "firmware/firmware.bin", "offset": 65536 }
+                ]
+              }
+            ]
+          }
+          EOF
+          sed -i "s/{{VERSION}}/$VERSION/g" site/index.html
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

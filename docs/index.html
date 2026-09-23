@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Gadget Installer</title>
+<meta name="description" content="Install the Claude Gadget firmware on a Waveshare ESP32-S3-Touch-AMOLED-1.75C from your browser.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11 8' shape-rendering='crispEdges'%3E%3Cpath fill='%23D97757' d='M1 0h9v2H1zM0 2h2v1H0zM3 2h5v1H3zM9 2h2v1H9zM0 3h11v1H0zM1 4h9v2H1zM1 6h1v2H1zM3 6h1v2H3zM7 6h1v2H7zM9 6h1v2H9z'/%3E%3C/svg%3E">
+<script type="module" src="https://unpkg.com/esp-web-tools@10/dist/web/install-button.js?module"></script>
+<style>
+  :root {
+    --bg: #FAF9F5; --card: #FFFFFF; --text: #1F1E1D; --muted: #6B6862; --line: #E6E3DA;
+    --accent: #D97757; --accent-ink: #FFFFFF; --code: #F0EEE6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #1F1E1D; --card: #2A2927; --text: #F0EEE6; --muted: #A6A39A; --line: #3A3935;
+      --accent: #D97757; --accent-ink: #1F1E1D; --code: #30302E;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #1F1E1D; --card: #2A2927; --text: #F0EEE6; --muted: #A6A39A; --line: #3A3935;
+    --accent: #D97757; --accent-ink: #1F1E1D; --code: #30302E;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 880px; margin: 0 auto; padding: 48px 16px 64px; }
+  h1, h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; line-height: 1.2; }
+  h1 { font-size: clamp(2rem, 6vw, 3rem); margin: 16px 0 8px; }
+  h2 { font-size: 1.6rem; margin: 48px 0 12px; }
+  p { margin: 8px 0; }
+  a { color: var(--accent); }
+  code { background: var(--code); padding: 2px 6px; border-radius: 6px; font-size: .92em; }
+  .muted { color: var(--muted); }
+  .clawd { width: 88px; height: 64px; animation: hop 1.1s ease-in-out infinite; }
+  @keyframes hop { 0%, 55%, 100% { transform: translateY(0); } 25% { transform: translateY(-10px); } }
+  @media (prefers-reduced-motion: reduce) { .clawd { animation: none; } }
+
+  .hero { display: grid; grid-template-columns: 1fr auto; gap: 32px; align-items: center; }
+  .hero img { width: 260px; max-width: 100%; }
+  @media (max-width: 680px) { .hero { grid-template-columns: 1fr; } .hero img { justify-self: center; } }
+
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; margin-top: 16px; }
+  .install { display: flex; flex-wrap: wrap; gap: 16px 24px; align-items: center; }
+  esp-web-install-button button[slot="activate"] {
+    background: var(--accent); color: var(--accent-ink); border: 0; border-radius: 12px;
+    padding: 14px 28px; font: 600 1.1rem/1 inherit; cursor: pointer;
+  }
+  esp-web-install-button button[slot="activate"]:hover { filter: brightness(1.08); }
+  .note { font-size: .92em; color: var(--muted); }
+
+  ol { padding-left: 1.3em; } ol li { margin: 6px 0; }
+
+  .shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; margin-top: 16px; }
+  .shots figure { margin: 0; text-align: center; }
+  .shots img { width: 100%; max-width: 220px; }
+  .shots figcaption { font-size: .9em; color: var(--muted); margin-top: 4px; }
+
+  table { border-collapse: collapse; width: 100%; }
+  td { padding: 8px 12px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+  td:first-child { white-space: nowrap; font-weight: 600; }
+  footer { margin-top: 56px; font-size: .88em; color: var(--muted); border-top: 1px solid var(--line); padding-top: 16px; }
+</style>
+</head>
+<body>
+<main>
+  <section class="hero">
+    <div>
+      <svg class="clawd" viewBox="0 0 11 8" shape-rendering="crispEdges" aria-hidden="true">
+        <path fill="#D97757" d="M1 0h9v2H1zM0 2h2v1H0zM3 2h5v1H3zM9 2h2v1H9zM0 3h11v1H0zM1 4h9v2H1zM1 6h1v2H1zM3 6h1v2H3zM7 6h1v2H7zM9 6h1v2H9z"/>
+      </svg>
+      <h1>Claude Gadget</h1>
+      <p>A small round desk display showing your Claude Pro/Max plan usage: the 5-hour session and weekly limits, when they reset, and an alert when you're running low.</p>
+      <p class="muted">For the Waveshare ESP32-S3-Touch-AMOLED-1.75C. Firmware {{VERSION}}.</p>
+    </div>
+    <img src="images/usage.png" alt="Usage screen: session 42%, weekly 67%, with reset times">
+  </section>
+
+  <h2>Install</h2>
+  <div class="card">
+    <div class="install">
+      <esp-web-install-button manifest="manifest.json">
+        <button slot="activate">Install firmware</button>
+        <span slot="unsupported">Your browser can't flash devices. Use desktop Chrome or Edge.</span>
+        <span slot="not-allowed">Flashing needs a secure (https) page.</span>
+      </esp-web-install-button>
+      <div class="note">Desktop Chrome or Edge &middot; USB-C <strong>data</strong> cable</div>
+    </div>
+    <ol>
+      <li>Plug the board into your computer and click <strong>Install firmware</strong>.</li>
+      <li>Pick the port (usually "USB JTAG/serial debug unit").</li>
+      <li>First install: choose <strong>Erase</strong>. Updating: don't erase, and your Wi-Fi, token and settings are kept.</li>
+    </ol>
+    <p class="note">If no port appears, hold <strong>BOOT</strong>, tap <strong>PWR</strong> (or replug), then release BOOT and try again.</p>
+  </div>
+
+  <h2>First-time setup</h2>
+  <div class="card">
+    <ol>
+      <li>Get a token: install <a href="https://docs.anthropic.com/en/docs/claude-code">Claude Code</a> and run <code>claude setup-token</code>. It prints a long-lived token starting <code>sk-ant-oat01-</code>.</li>
+      <li>The gadget shows a QR code. Scan it or join the <strong>Claude-Gadget-XXXX</strong> Wi-Fi network; the setup page opens (otherwise browse to <code>192.168.4.1</code>).</li>
+      <li>Choose your Wi-Fi, paste the token, check the timezone, and save.</li>
+    </ol>
+    <p>Usage appears a few seconds later. See the <a href="https://github.com/markab/claude-gadget#readme">README</a> for controls and settings.</p>
+  </div>
+
+  <h2>Screens</h2>
+  <div class="shots">
+    <figure><img src="images/usage.png" alt="Usage screen" loading="lazy"><figcaption>Usage</figcaption></figure>
+    <figure><img src="images/clock.png" alt="Clock screen" loading="lazy"><figcaption>Clock</figcaption></figure>
+    <figure><img src="images/settings.png" alt="Display settings" loading="lazy"><figcaption>Display settings</figcaption></figure>
+    <figure><img src="images/sound.png" alt="Sound and alerts settings" loading="lazy"><figcaption>Sound &amp; alerts</figcaption></figure>
+    <figure><img src="images/wifi.png" alt="Saved Wi-Fi networks" loading="lazy"><figcaption>Wi-Fi</figcaption></figure>
+    <figure><img src="images/battery.png" alt="Battery details" loading="lazy"><figcaption>Battery</figcaption></figure>
+    <figure><img src="images/device.png" alt="Device details" loading="lazy"><figcaption>Device</figcaption></figure>
+    <figure><img src="images/setup-hotspot.png" alt="Setup screen with Wi-Fi QR code" loading="lazy"><figcaption>Setup</figcaption></figure>
+  </div>
+
+  <h2>Controls</h2>
+  <div class="card">
+    <table>
+      <tr><td>PWR tap</td><td>Screen on / off</td></tr>
+      <tr><td>PWR hold 2 s</td><td>Power off. Press PWR to power on.</td></tr>
+      <tr><td>BOOT tap</td><td>Refresh usage now</td></tr>
+      <tr><td>BOOT hold 3 s</td><td>Open the setup hotspot (add Wi-Fi, change token or timezone)</td></tr>
+      <tr><td>Swipe</td><td>Right from Usage for the clock; left for settings, Wi-Fi, battery and device pages</td></tr>
+    </table>
+  </div>
+
+  <footer>
+    <p>Unofficial fan project, not affiliated with or endorsed by Anthropic. Claude is a trademark of Anthropic.
+    Usage is read from rate-limit headers on a minimal API request, an approach that could stop working without notice.</p>
+    <p><a href="https://github.com/markab/claude-gadget">Source on GitHub</a></p>
+  </footer>
+</main>
+</body>
+</html>
