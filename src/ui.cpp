@@ -32,7 +32,7 @@ static lv_obj_t *lblStatusBar, *lblSessionPct, *lblSessionReset, *lblWeekPct, *l
 static lv_obj_t *arcBatt, *lblBattPct, *lblBattState, *lblBattDetail;
 
 // Info tile
-static lv_obj_t *lblInfo;
+static lv_obj_t *lblInfo, *arcRam, *arcPsram;
 
 // Overlays
 static lv_obj_t *setupLayer, *setupTitle, *setupBody, *setupQr;
@@ -183,6 +183,11 @@ static void build_battery(lv_obj_t *t) {
 }
 
 static void build_info(lv_obj_t *t) {
+    arcRam = make_arc(t, 452, 20, COL_CLAUDE);   // internal RAM (heap) in use
+    arcPsram = make_arc(t, 396, 12, COL_WEEK);   // PSRAM in use
+    lv_arc_set_range(arcRam, 0, 100);
+    lv_arc_set_range(arcPsram, 0, 100);
+
     lv_obj_t *cap = make_label(t, &lv_font_montserrat_16, COL_MUTED);
     lv_label_set_text(cap, "DEVICE");
     lv_obj_align(cap, LV_ALIGN_TOP_MID, 0, 70);
@@ -733,7 +738,16 @@ static void update_info(const NetStatus &n) {
     s += "Saved Wi-Fi networks: " + String(n.saved) + "\n";
     s += "Refresh every " + String(settings.pollMins) + " min\n";
     s += "Up " + fmt_duration(up) + "\n";
-    s += "Heap " + String(ESP.getFreeHeap() / 1024) + " KB \xE2\x80\xA2 PSRAM " + String(ESP.getFreePsram() / 1024) + " KB\n";
+    size_t ramTotal = heap_caps_get_total_size(MALLOC_CAP_INTERNAL);
+    size_t ramFree = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
+    size_t psTotal = ESP.getPsramSize(), psFree = ESP.getFreePsram();
+    int ramPct = ramTotal ? 100 - (int)(ramFree * 100 / ramTotal) : 0;
+    int psPct = psTotal ? 100 - (int)(psFree * 100 / psTotal) : 0;
+    lv_arc_set_value(arcRam, ramPct);
+    lv_arc_set_value(arcPsram, psPct);
+    lv_obj_set_style_arc_color(arcRam, level_color(ramPct, COL_CLAUDE), LV_PART_INDICATOR);
+    lv_obj_set_style_arc_color(arcPsram, level_color(psPct, COL_WEEK), LV_PART_INDICATOR);
+    s += "RAM " + String(ramPct) + "% \xE2\x80\xA2 PSRAM " + String(psPct) + "%\n";
     s += "Firmware " FW_VERSION;
     lv_label_set_text(lblInfo, s.c_str());
 }
