@@ -196,11 +196,18 @@ static void build_info(lv_obj_t *t) {
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -56);
 }
 
-static int to_pct(int v) { return (v * 100 + 127) / 255; }
+// Brightness sliders move in 5% steps (slider value = step, 1..20); settings keep the 0-255 level.
+static const int BRIGHT_STEP_PCT = 5, BRIGHT_STEPS = 100 / BRIGHT_STEP_PCT;
+static uint8_t step_to_level(int step) { return (step * BRIGHT_STEP_PCT * 255 + 50) / 100; }
+static int level_to_step(uint8_t level) {
+    int step = (level * 100 / 255 + BRIGHT_STEP_PCT / 2) / BRIGHT_STEP_PCT;
+    return constrain(step, 1, BRIGHT_STEPS);
+}
 
 static void bright_cb(lv_event_t *e) {
-    int v = lv_slider_get_value(sldBright);
-    lv_label_set_text_fmt(lblBright, "Brightness  %d%%", to_pct(v));
+    int step = lv_slider_get_value(sldBright);
+    uint8_t v = step_to_level(step);
+    lv_label_set_text_fmt(lblBright, "Brightness  %d%%", step * BRIGHT_STEP_PCT);
     settings.brightness = v;
     display_set_brightness(v);
     if (lv_event_get_code(e) == LV_EVENT_RELEASED) settings_save();  // only write flash on release
@@ -208,8 +215,9 @@ static void bright_cb(lv_event_t *e) {
 
 // Previews the dim level on the panel while dragging, then restores normal brightness.
 static void dim_level_cb(lv_event_t *e) {
-    int v = lv_slider_get_value(sldDimLevel);
-    lv_label_set_text_fmt(lblDimLevel, "Dimmed  %d%%", to_pct(v));
+    int step = lv_slider_get_value(sldDimLevel);
+    uint8_t v = step_to_level(step);
+    lv_label_set_text_fmt(lblDimLevel, "Dimmed  %d%%", step * BRIGHT_STEP_PCT);
     settings.dimBrightness = v;
     lv_event_code_t code = lv_event_get_code(e);
     if (code == LV_EVENT_RELEASED) {
@@ -248,16 +256,16 @@ static void build_settings(lv_obj_t *t) {
     lblBright = make_label(t, &lv_font_montserrat_20, COL_TEXT);
     lv_obj_align(lblBright, LV_ALIGN_CENTER, 0, -118);
     sldBright = make_slider(t, -84, COL_CLAUDE);
-    lv_slider_set_range(sldBright, 10, 255);
-    lv_slider_set_value(sldBright, settings.brightness, LV_ANIM_OFF);
+    lv_slider_set_range(sldBright, 1, BRIGHT_STEPS);
+    lv_slider_set_value(sldBright, level_to_step(settings.brightness), LV_ANIM_OFF);
     lv_obj_add_event_cb(sldBright, bright_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(sldBright, bright_cb, LV_EVENT_RELEASED, NULL);
 
     lblDimLevel = make_label(t, &lv_font_montserrat_20, COL_TEXT);
     lv_obj_align(lblDimLevel, LV_ALIGN_CENTER, 0, -34);
     sldDimLevel = make_slider(t, 0, COL_MUTED);
-    lv_slider_set_range(sldDimLevel, 2, 255);
-    lv_slider_set_value(sldDimLevel, settings.dimBrightness, LV_ANIM_OFF);
+    lv_slider_set_range(sldDimLevel, 1, BRIGHT_STEPS);
+    lv_slider_set_value(sldDimLevel, level_to_step(settings.dimBrightness), LV_ANIM_OFF);
     lv_obj_add_event_cb(sldDimLevel, dim_level_cb, LV_EVENT_VALUE_CHANGED, NULL);
     lv_obj_add_event_cb(sldDimLevel, dim_level_cb, LV_EVENT_PRESSED, NULL);
     lv_obj_add_event_cb(sldDimLevel, dim_level_cb, LV_EVENT_RELEASED, NULL);
