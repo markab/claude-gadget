@@ -280,7 +280,8 @@ static void build_settings(lv_obj_t *t) {
 
 static void set_trash_label(lv_obj_t *btn, bool armed) {
     lv_obj_t *l = lv_obj_get_child(btn, 0);
-    lv_label_set_text(l, armed ? "Delete?" : LV_SYMBOL_TRASH);
+    lv_label_set_text(l, armed ? "Delete?" : LV_SYMBOL_CLOSE);
+    lv_obj_set_style_text_font(l, armed ? &lv_font_montserrat_16 : &lv_font_montserrat_28, 0);
     lv_obj_set_style_bg_color(btn, armed ? COL_CRIT : COL_TRACK, 0);
 }
 
@@ -314,7 +315,7 @@ static void forget_cb(lv_event_t *e) {
     disarm();
     if (ssid.isEmpty()) return;
     net_forget(ssid);
-    ui_flash_message((String(LV_SYMBOL_TRASH " Forgot ") + ssid).c_str());
+    ui_flash_message((String("Forgot ") + ssid).c_str());
 }
 
 static void rebuild_wifi_list(const NetStatus &n) {
@@ -372,7 +373,7 @@ static void build_wifi(lv_obj_t *t) {
     lv_obj_set_scrollbar_mode(wifiList, LV_SCROLLBAR_MODE_OFF);
 
     lv_obj_t *hint = make_label(t, &lv_font_montserrat_14, COL_MUTED);
-    lv_label_set_text(hint, "Tap " LV_SYMBOL_TRASH " twice to forget\nHold BOOT 3s to add a network");
+    lv_label_set_text(hint, "Tap " LV_SYMBOL_CLOSE " twice to forget\nHold BOOT 3s to add a network");
     lv_obj_align(hint, LV_ALIGN_BOTTOM_MID, 0, -52);
 }
 
