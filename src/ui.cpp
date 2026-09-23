@@ -214,13 +214,19 @@ static void build_info(lv_obj_t *t) {
     lv_obj_align(line, LV_ALIGN_CENTER, 0, 10);
 
     // Firmware version, replaced by an "Update" pill when a newer release exists.
+    lv_obj_t *fwCap = make_label(t, &lv_font_montserrat_16, COL_MUTED);
+    lv_label_set_text(fwCap, "FIRMWARE");
+    lv_obj_align(fwCap, LV_ALIGN_CENTER, 0, 34);
+
     lblFw = make_label(t, &lv_font_montserrat_28, COL_TEXT);
-    lv_label_set_text(lblFw, "Firmware " FW_VERSION);
-    lv_obj_align(lblFw, LV_ALIGN_CENTER, 0, 54);
+    lv_label_set_long_mode(lblFw, LV_LABEL_LONG_DOT);   // dev builds have long git-describe versions
+    lv_obj_set_size(lblFw, 290, 34);   // fixed height so LONG_DOT trims instead of wrapping
+    lv_label_set_text(lblFw, FW_VERSION);
+    lv_obj_align(lblFw, LV_ALIGN_CENTER, 0, 66);
 
     lblFwStatus = make_label(t, &lv_font_montserrat_16, COL_OK);
     lv_label_set_text(lblFwStatus, "");
-    lv_obj_align(lblFwStatus, LV_ALIGN_CENTER, 0, 90);
+    lv_obj_align(lblFwStatus, LV_ALIGN_CENTER, 0, 100);
 
     btnUpdate = lv_btn_create(t);
     lv_obj_set_height(btnUpdate, 44);
@@ -228,7 +234,7 @@ static void build_info(lv_obj_t *t) {
     lv_obj_set_style_radius(btnUpdate, 22, 0);
     lv_obj_set_style_bg_color(btnUpdate, COL_CLAUDE, 0);
     lv_obj_set_style_shadow_width(btnUpdate, 0, 0);
-    lv_obj_align(btnUpdate, LV_ALIGN_CENTER, 0, 60);
+    lv_obj_align(btnUpdate, LV_ALIGN_CENTER, 0, 70);
     lblUpdate = make_label(btnUpdate, &lv_font_montserrat_20, lv_color_hex(0x1F1E1D));
     lv_obj_center(lblUpdate);
     lv_obj_add_flag(btnUpdate, LV_OBJ_FLAG_HIDDEN);
