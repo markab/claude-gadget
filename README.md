@@ -180,6 +180,7 @@ You can also update from the [web installer](https://markab.github.io/claude-gad
 
 ## Power and battery
 
+- **Waking:** tap the screen, or press PWR or BOOT, to wake it.
 - **On battery:** the screen turns off after the auto-dim time. With the screen off, Wi-Fi switches off and the chip sleeps. When you wake it, the last numbers show immediately and fresh ones follow within a few seconds.
 - **On USB:** the screen dims instead of turning off. If you turn the screen off with PWR, it stays connected and keeps refreshing.
 - **Low battery:** the gadget warns you, then powers itself off after 30 s below 3.3 V.

@@ -48,39 +48,51 @@ def write_png(path, w, h, rgb565):
         f.write(png)
 
 
+EXPECTED = ["clock", "usage", "settings", "sound", "wifi", "battery", "device", "setup-hotspot"]
+
+
+def capture_round(s, saved):
+    """One 's' request. Saves every image whose trailer checks out; a log line
+    landing mid-transfer shifts the bytes (a torn image), so those are skipped."""
+    s.reset_input_buffer()
+    s.write(b"s")
+    deadline = time.time() + 120
+    while time.time() < deadline:
+        line = s.readline().decode(errors="replace").strip()
+        if line == "SNAPDONE":
+            return
+        if not line.startswith("SNAP "):
+            continue  # regular log output
+        _, name, w, h = line.split()
+        w, h = int(w), int(h)
+        data = s.read(w * h * 2)
+        tail = s.read(5)  # "\nEND\n"
+        if len(data) != w * h * 2 or tail != b"\nEND\n":
+            print(f"  {name}: corrupted in transfer, will retry")
+            continue
+        if name in saved:
+            continue
+        path = os.path.join(OUT, f"{name}.png")
+        write_png(path, w, h, data)
+        saved.add(name)
+        print(f"{name}: {w}x{h} -> {os.path.relpath(path)}")
+
+
 def main():
     port = sys.argv[1] if len(sys.argv) > 1 else (glob.glob("/dev/cu.usbmodem*") or [None])[0]
     if not port:
         sys.exit("No /dev/cu.usbmodem* port found; pass one explicitly.")
     os.makedirs(OUT, exist_ok=True)
     s = serial.Serial(port, 115200, timeout=10)
-    s.reset_input_buffer()
-    s.write(b"s")
-    deadline = time.time() + 120
-    while time.time() < deadline:
-        line = s.readline().decode(errors="replace").strip()
-        if not line:
-            continue
-        if line == "SNAPDONE":
+    saved = set()
+    for attempt in range(5):
+        capture_round(s, saved)
+        missing = [n for n in EXPECTED if n not in saved]
+        if not missing:
             print("done")
             return
-        if line.startswith("SNAPFAIL"):
-            print("device failed:", line)
-            continue
-        if not line.startswith("SNAP "):
-            continue  # regular log output
-        _, name, w, h = line.split()
-        w, h = int(w), int(h)
-        data = s.read(w * h * 2)
-        if len(data) != w * h * 2:
-            sys.exit(f"{name}: short read ({len(data)} bytes)")
-        tail = s.read(5)  # "\nEND\n"
-        if tail != b"\nEND\n":
-            print(f"warning: {name}: unexpected trailer {tail!r} (log output interleaved?)")
-        path = os.path.join(OUT, f"{name}.png")
-        write_png(path, w, h, data)
-        print(f"{name}: {w}x{h} -> {os.path.relpath(path)}")
-    sys.exit("timed out")
+        print(f"retrying: {', '.join(missing)}")
+    sys.exit(f"gave up on: {', '.join(missing)}")
 
 
 if __name__ == "__main__":
