@@ -1,6 +1,7 @@
 #include "net.h"
 #include "settings.h"
 #include "claude.h"
+#include "portal_theme.h"
 #include <WiFi.h>
 #include <WiFiManager.h>
 #include <Preferences.h>
@@ -199,7 +200,7 @@ void net_begin() {
     wm.setConfigPortalBlocking(false);
     wm.setConnectTimeout(20);
     wm.setTitle("Claude Gadget");
-    wm.setDarkMode(true);
+    wm.setCustomHeadElement(PORTAL_HEAD);  // Claude colours + Clawd (replaces WiFiManager's dark mode)
     wm.setShowInfoUpdate(false);           // no OTA upload from the portal
     std::vector<const char *> menu = {"wifi", "param", "info", "sep", "restart"};
     wm.setMenu(menu);
